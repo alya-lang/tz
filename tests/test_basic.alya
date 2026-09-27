@@ -22,7 +22,7 @@ function main()
     runner_assert_str_eq(r, pkg::tz_canonical("Europe/Berlin"), "Europe/Berlin", "canonical names pass through")
 
     let names = pkg::tz_names()
-    runner_assert_eq(r, len(names), 53, "53 bundled zones")
+    runner_assert_eq(r, len(names), 79, "79 bundled zones")
     runner_assert_true(r, names_contains(names, "Pacific/Auckland"), "Auckland listed")
 
     let rule = pkg::tz_rule("Asia/Tokyo")
@@ -142,6 +142,55 @@ function main()
         threw = 1
     end
     runner_assert_eq(r, threw, 1, "Feb 29 2023 throws")
+
+    # ═══════════════════════════════════════════════════════════
+    # 8. Extended coverage: odd offsets, new zones, new API, Windows keys
+    # ═══════════════════════════════════════════════════════════
+    runner_assert_eq(r, pkg::tz_offset_min("Asia/Kathmandu", 1704067200), 345, "Kathmandu +345")
+    runner_assert_eq(r, pkg::tz_offset_min("Australia/Eucla", 1704067200), 525, "Eucla +525")
+    runner_assert_eq(r, pkg::tz_offset_min("Pacific/Marquesas", 1704067200), 0 - 570, "Marquesas -570")
+    runner_assert_eq(r, pkg::tz_offset_min("America/St_Johns", 1704067200), 0 - 210, "St_Johns NST in January")
+    runner_assert_eq(r, pkg::tz_offset_min("America/St_Johns", 1721068245), 0 - 150, "St_Johns NDT in July")
+    runner_assert_eq(r, pkg::tz_offset_min("Australia/Adelaide", 1704067200), 630, "Adelaide ACDT in January")
+    runner_assert_eq(r, pkg::tz_offset_min("Australia/Adelaide", 1721068245), 570, "Adelaide ACST in July")
+    runner_assert_eq(r, pkg::tz_offset_min("Pacific/Chatham", 1704067200), 825, "Chatham +1345 in January")
+    runner_assert_eq(r, pkg::tz_offset_min("Asia/Beirut", 1721068245), 180, "Beirut EEST in July")
+    runner_assert_eq(r, pkg::tz_offset_min("Europe/Kyiv", 1721068245), 180, "Kyiv EEST in July")
+    runner_assert_eq(r, pkg::tz_offset_min("America/Havana", 1721068245), 0 - 240, "Havana CDT in July")
+    runner_assert_eq(r, pkg::tz_offset_min("Australia/Brisbane", 1704067200), 600, "Brisbane +600 fixed")
+    runner_assert_eq(r, pkg::zoned_to_epoch(pkg::epoch_to_zoned(1704067200, "Asia/Kathmandu"), "Asia/Kathmandu"), 1704067200, "Kathmandu roundtrip")
+
+    runner_assert_eq(r, pkg::tz_is_dst("America/New_York", 1704067200), 0, "NY not DST in January")
+    runner_assert_eq(r, pkg::tz_is_dst("America/New_York", 1721068245), 1, "NY DST in July")
+    runner_assert_eq(r, pkg::tz_is_dst("Asia/Tokyo", 1721068245), 0, "fixed zone never DST")
+    runner_assert_eq(r, pkg::tz_is_dst("Australia/Sydney", 1704067200), 1, "Sydney DST in January")
+
+    runner_assert_str_eq(r, pkg::tz_offset_str("Europe/Istanbul", 1704067200), "+03:00", "offset_str Istanbul")
+    runner_assert_str_eq(r, pkg::tz_offset_str("America/New_York", 1704067200), "-05:00", "offset_str NY winter")
+    runner_assert_str_eq(r, pkg::tz_offset_str("Etc/UTC", 0), "+00:00", "offset_str UTC")
+    runner_assert_str_eq(r, pkg::tz_offset_str("Asia/Kathmandu", 0), "+05:45", "offset_str Kathmandu")
+
+    runner_assert_str_eq(r, pkg::format_zoned(pkg::epoch_to_zoned(1704067200, "Asia/Shanghai")), "2024-01-01 08:00:00+08:00", "format_zoned Shanghai")
+    runner_assert_str_eq(r, pkg::format_zoned(pkg::epoch_to_zoned(1721068245, "America/New_York")), "2024-07-15 14:30:45-04:00", "format_zoned NY summer")
+
+    let now_wall = pkg::zoned_now("Etc/UTC")
+    runner_assert_true(r, now_wall["year"] >= 2026, "zoned_now year sane")
+    runner_assert_str_eq(r, now_wall["iana"], "Etc/UTC", "zoned_now iana")
+
+    runner_assert_str_eq(r, pkg::tz_windows_iana("Turkey Standard Time"), "Europe/Istanbul", "windows table maps key")
+    runner_assert_str_eq(r, pkg::tz_windows_iana("No Such Zone"), "", "windows table unknown is empty")
+
+    let win_rule = pkg::tz_rule("Turkey Standard Time")
+    let win_ok = 0
+    if win_rule is null
+        win_ok = 0
+    else
+        win_ok = 1
+    end
+    runner_assert_eq(r, win_ok, 1, "Windows key resolves to a rule")
+    runner_assert_str_eq(r, win_rule.name, "Europe/Istanbul", "Windows key rule is Istanbul")
+    runner_assert_eq(r, pkg::tz_offset_min("Eastern Standard Time", 1704067200), 0 - 300, "Windows key offset works")
+    runner_assert_eq(r, pkg::epoch_to_zoned(1704067200, "Tokyo Standard Time")["hour"], 9, "Windows key conversion works")
 
     let failed = runner_summary(r)
     if failed > 0

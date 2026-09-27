@@ -13,10 +13,11 @@ import "./engine.alya"
 # Primary Facade APIs (thin delegates over ./engine.alya)
 # ───────────────────────────────────────────────────────────────
 
-## Resolves a zone name or alias to its rule, or null when unknown.
+## Resolves a zone name, alias, or Windows key to its rule, or null when unknown.
 ##
 ## ### Parameters
-## - `name`: IANA zone name or alias (`"UTC"` resolves to `"Etc/UTC"`).
+## - `name`: IANA zone name, alias (`"UTC"` resolves to `"Etc/UTC"`), or
+##   Windows key (`"Turkey Standard Time"` resolves via the bundled table).
 ##
 ## ### Returns
 ## The matching `TzRule`, or null when the zone is not bundled.
@@ -46,6 +47,61 @@ pub function tz_names() -> array
     return engine_tz_names()
 end
 
+## Returns 1 when daylight saving is active in the zone at the epoch.
+##
+## ### Parameters
+## - `name`: IANA zone name, alias, or Windows key.
+## - `epoch`: UTC epoch seconds.
+##
+## ### Returns
+## 1 when the daylight offset applies, 0 otherwise (fixed zones always 0).
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function tz_is_dst(name: string, epoch: int) -> int
+    return engine_tz_is_dst(name, epoch)
+end
+
+## Formats a minute offset as `+HH:MM` (zero renders as `+00:00`).
+##
+## ### Parameters
+## - `name`: IANA zone name, alias, or Windows key.
+## - `epoch`: UTC epoch seconds.
+##
+## ### Returns
+## Offset string such as `"+03:00"` or `"-05:00"`.
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function tz_offset_str(name: string, epoch: int) -> string
+    return engine_tz_offset_str(name, epoch)
+end
+
+## Converts the current UTC time to a zoned calendar map.
+##
+## ### Parameters
+## - `name`: IANA zone name, alias, or Windows key.
+##
+## ### Returns
+## Zoned calendar map for `time()` (see `epoch_to_zoned` for the shape).
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function zoned_now(name: string)
+    return engine_zoned_now(name)
+end
+
+## Formats a zoned calendar map as `YYYY-MM-DD HH:MM:SS+HH:MM`.
+##
+## ### Parameters
+## - `d`: Zoned calendar map from `epoch_to_zoned` (must carry `offset_min`).
+##
+## ### Returns
+## Wall time with numeric offset, e.g. `"2024-01-01 08:00:00+08:00"`.
+pub function format_zoned(d) -> string
+    return engine_format_zoned(d)
+end
+
 ## Resolves well-known aliases to canonical IANA names.
 ##
 ## ### Parameters
@@ -55,6 +111,17 @@ end
 ## Canonical name when `name` is a known alias, otherwise `name` unchanged.
 pub function tz_canonical(name: string) -> string
     return tzdata_canonical(name)
+end
+
+## Resolves a Windows zone key to IANA (mirrored table, see `sysinfo`).
+##
+## ### Parameters
+## - `name`: Windows zone key or IANA name.
+##
+## ### Returns
+## IANA zone name, or "" when unmappable.
+pub function tz_windows_iana(name: string) -> string
+    return tzdata_windows_iana(name)
 end
 
 ## Returns the UTC offset in minutes active in the zone at the epoch.

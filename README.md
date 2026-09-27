@@ -11,10 +11,12 @@ IANA timezone database and zone-aware datetime conversion for Alya
 
 ## 🌟 Features
 
-- 🌍 **53 Bundled IANA Zones**: Fixed-offset zones (exact) plus recurring current-era DST rules (US, EU, Australia, New Zealand, Egypt)
-- ⏰ **Zone-Aware Conversion**: `epoch_to_zoned` / `zoned_to_epoch` roundtrips over `std/time`, with gap/fold documented behavior
-- 📏 **Offset & Abbreviation Lookup**: `tz_offset_min` / `tz_abbrev` evaluated at any UTC epoch (transition-second precision)
-- 🧩 **Modular Architecture**: Clean public facade (`src/lib.alya`), rule model (`src/types.alya`), conversion engine (`src/engine.alya`), embedded data (`src/tzdata/zones.alya`)
+- 🌍 **79 Bundled IANA Zones**: Fixed-offset zones (exact, including half/quarter-hour offsets) plus recurring current-era DST rules (US, EU, Australia, New Zealand, Egypt, Chile, Fiji, Paraguay, Lebanon)
+- 🪟 **Windows Key Resolution**: Built-in mirrored Windows→IANA table, so OS-native names like `"Turkey Standard Time"` work directly — no `sysinfo` dependency
+- ⏰ **Zone-Aware Conversion**: `epoch_to_zoned` / `zoned_to_epoch` / `zoned_now` roundtrips over `std/time`, with gap/fold documented behavior
+- 📏 **Offset & Abbreviation Lookup**: `tz_offset_min` / `tz_offset_str` / `tz_abbrev` / `tz_is_dst` evaluated at any UTC epoch (transition-second precision)
+- 🖨️ **Wall-Time Formatting**: `format_zoned` renders `YYYY-MM-DD HH:MM:SS+HH:MM`
+- 🧩 **Modular Architecture**: Clean public facade (`src/lib.alya`), rule model (`src/types.alya`), conversion engine (`src/engine.alya`), embedded data (`src/tzdata/zones.alya`, `src/tzdata/windows.alya`)
 - 🔒 **Public/Private Visibility (`pub`)**: Engine internals (`engine_*`, `tzdata_*`) stay out of the facade; consumers use the documented API
 - 🛡️ **Structured Errors**: Unknown zones and invalid dates throw `TzError`, caught with standard `try`/`catch`
 - 🧪 **Test & Benchmark Suite**: 66 assertions (`std/test`) covering transitions, roundtrips, and error paths, plus micro-benchmarks
@@ -34,8 +36,9 @@ tz/
 │   ├── lib.alya            # Public API facade (tz_offset_min, epoch_to_zoned, zoned_to_epoch, ...)
 │   ├── types.alya          # TzRule / TzError models, fixed_rule / dst_rule factories
 │   ├── engine.alya         # Offset engine, transition math, conversions (engine_* internals)
-│   └── tzdata/             # Embedded zone table (mirrors V's time.tzdata role)
-│       └── zones.alya      # 53 bundled rules + alias canonicalization
+│   └── tzdata/             # Embedded zone tables (mirrors V's time.tzdata role)
+│       ├── zones.alya      # 79 bundled rules + alias canonicalization
+│       └── windows.alya    # Mirrored Windows→IANA table (canonical source: sysinfo)
 ├── examples/
 │   └── demo.alya           # Runnable walkthrough of all package capabilities
 ├── tests/
@@ -94,13 +97,18 @@ main()
 
 | Symbol | Visibility | Description |
 |---|---|---|
-| `tz_offset_min(name, epoch)` | `pub function` | UTC offset in minutes east of UTC active at the epoch. Throws `TzError` for unknown zones. |
+| `tz_offset_min(name, epoch)` | `pub function` | UTC offset in minutes east of UTC active at the epoch. Accepts IANA names, aliases, and Windows keys. Throws `TzError` for unknown zones. |
+| `tz_offset_str(name, epoch)` | `pub function` | Offset as `+HH:MM` (`"+03:00"`, `"-05:00"`, `"+00:00"`). Throws `TzError` for unknown zones. |
 | `tz_abbrev(name, epoch)` | `pub function` | Active zone abbreviation (`"EST"`/`"EDT"`). Throws `TzError` for unknown zones. |
+| `tz_is_dst(name, epoch)` | `pub function` | 1 when daylight saving applies, 0 otherwise. Throws `TzError` for unknown zones. |
 | `epoch_to_zoned(epoch, name)` | `pub function` | UTC epoch to zoned calendar map (`year`..`weekday` plus `offset_min`, `abbr`, `iana`). Throws `TzError` for unknown zones. |
+| `zoned_now(name)` | `pub function` | Zoned calendar map for the current time. Throws `TzError` for unknown zones. |
+| `format_zoned(d)` | `pub function` | Zoned map to `YYYY-MM-DD HH:MM:SS+HH:MM`. |
+| `tz_rule(name)` | `pub function` | Zone rule lookup (IANA, alias, or Windows key), or null when the zone is not bundled. |
+| `tz_windows_iana(name)` | `pub function` | Windows key to IANA via the mirrored table, or "" when unmappable. |
+| `tz_names()` | `pub function` | Array of all 79 bundled IANA zone names. |
 | `zoned_to_epoch(d, name)` | `pub function` | Zoned wall-time map to UTC epoch (gaps resolve forward, folds to standard-time occurrence). Throws `TzError` for unknown zones or invalid dates. |
-| `tz_rule(name)` | `pub function` | Zone rule lookup, or null when the zone is not bundled. |
-| `tz_is_valid(name)` | `pub function` | 1 for bundled zones/aliases, 0 otherwise. |
-| `tz_names()` | `pub function` | Array of all 53 bundled IANA zone names. |
+| `tz_is_valid(name)` | `pub function` | 1 for bundled zones, aliases, and Windows keys, 0 otherwise. |
 | `tz_canonical(name)` | `pub function` | Alias canonicalization (`"UTC"` → `"Etc/UTC"`). |
 | `TzRule` | `pub struct` | Zone rule model (offsets, recurring DST schedule, UTC/local transition flags). |
 | `TzRule.has_dst()` | `pub method` | 1 for DST zones, 0 for fixed zones. |

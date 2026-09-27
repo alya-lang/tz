@@ -16,8 +16,9 @@ function main()
     say "UTC instant:      " + format_iso(epoch)
     for z in ["Asia/Shanghai", "Europe/Istanbul", "America/New_York", "Pacific/Auckland"]
         let w = pkg::epoch_to_zoned(epoch, z)
-        say z + " -> " + wall_str(w) + " " + w["abbr"] + " (UTC" + show_offset(w["offset_min"]) + ")"
+        say z + " -> " + pkg::format_zoned(w) + " " + w["abbr"]
     end
+    say "Windows key:  " + pkg::format_zoned(pkg::epoch_to_zoned(epoch, "Turkey Standard Time"))
     say ""
 
     # ───────────────────────────────────────────────────────────
@@ -33,8 +34,9 @@ function main()
     # ───────────────────────────────────────────────────────────
     say "--- 3. Roundtrip ---"
     let wall = pkg::epoch_to_zoned(epoch, "Europe/Berlin")
-    say "Berlin wall:  " + wall_str(wall)
+    say "Berlin wall:  " + pkg::format_zoned(wall)
     say "Back to epoch: " + str(pkg::zoned_to_epoch(wall, "Europe/Berlin"))
+    say "Now in Tokyo: " + pkg::format_zoned(pkg::zoned_now("Asia/Tokyo"))
     say ""
 
     # ───────────────────────────────────────────────────────────
@@ -45,27 +47,6 @@ function main()
     say "UTC canonical: " + pkg::tz_canonical("UTC")
     say ""
     say "Done!"
-end
-
-function show_offset(off_min: int) -> string
-    let sign = "+"
-    let v = off_min
-    if v < 0
-        sign = "-"
-        v = 0 - v
-    end
-    return sign + str(v / 60)
-end
-
-function pad2(n: int) -> string
-    if n < 10
-        return f"0{n}"
-    end
-    return str(n)
-end
-
-function wall_str(w) -> string
-    return f"{w["year"]}-{pad2(w["month"])}-{pad2(w["day"])} {pad2(w["hour"])}:{pad2(w["minute"])}:{pad2(w["second"])}"
 end
 
 main()

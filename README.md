@@ -133,7 +133,7 @@ main()
 
 ---
 
-## 🗺️ Zone Coverage (97 bundled)
+### 🗺️ Zone Coverage (97 bundled)
 
 | Zone | Std (min) | Rule |
 |---|---|---|

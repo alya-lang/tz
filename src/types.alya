@@ -1,434 +1,156 @@
 ## tz Types & Data Structures
 ##
 ## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
-## Defines configuration models, enumerations, structural interfaces, and associated methods
-## showcasing the full range of modern Alya type system capabilities.
+## Zone rule model for IANA-style timezone conversion with recurring
+## current-era daylight saving rules.
 
 # ───────────────────────────────────────────────────────────────
-# Structural Interfaces (Duck Typing)
+# Error Type
 # ───────────────────────────────────────────────────────────────
 
-## Public interface for objects capable of producing a formatted string summary.
-##
-## Any struct implementing a `summary(self) -> string` method implicitly
-## satisfies this interface via Alya's structural duck-typing runtime.
-pub interface Summarizable
-    function summary(self) -> string
-end
-
-## Public interface for objects that provide detailed status descriptions and validation.
-##
-## Structs implementing `describe(self) -> string` and `is_valid(self) -> int`
-## satisfy this contract without explicit inheritance declarations.
-pub interface Describable
-    function describe(self) -> string
-    function is_valid(self) -> int
-end
-
-# ───────────────────────────────────────────────────────────────
-# Enumerations
-# ───────────────────────────────────────────────────────────────
-
-## Public enumeration of entity lifecycle status states.
-##
-## Defines sequential status codes from pending to completed or error states.
-pub enum TzStatus
-    Pending = 0,
-    Active = 1,
-    Archived = 2,
-    Error = 3
-end
-
-## Public enumeration of operational priority levels.
-##
-## Used to determine dispatch scheduling, queue ordering, and urgency tiers.
-pub enum TzPriority
-    Low = 0,
-    Normal = 1,
-    High = 2,
-    Critical = 3
-end
-
-## Public enumeration of greeting and presentation styles.
-##
-## Governs formatting salutations, prefixes, and stylistic tone.
-pub enum TzStyle
-    Standard = 0,
-    Formal = 1,
-    Casual = 2
-end
-
-# ───────────────────────────────────────────────────────────────
-# Data Models (Structs)
-# ───────────────────────────────────────────────────────────────
-
-## Configuration data model holding execution parameters and metadata.
-##
-## Encapsulates target identity, counter thresholds, priority tier, stylistic
-## mode, active status flag, and associated classification tags.
+## Error thrown when a zone name is unknown or a zoned conversion fails.
 ##
 ## ### Fields
-## - `name`: Validated entity identifier string.
-## - `count`: Repetition limit or processing counter.
-## - `priority`: Operational priority level (`TzPriority` enum value).
-## - `style`: Presentation style variant (`TzStyle` enum value).
-## - `enabled`: Activation flag (1 for active, 0 for inactive).
-## - `tags`: Categorical metadata tags array.
-pub struct TzConfig
+## - `message`: Human-readable failure description.
+pub struct TzError
+    message: string
+end
+
+# ───────────────────────────────────────────────────────────────
+# Zone Rule Model
+# ───────────────────────────────────────────────────────────────
+
+## Recurring daylight-saving rule for one IANA zone (current era).
+##
+## Offsets are minutes east of UTC (UTC+3 -> 180). A fixed zone sets
+## `dst_start_month` to 0 and ignores the remaining DST fields.
+## Transition rules are nth-weekday-of-month: `week` 1-4 selects the nth
+## occurrence, 5 selects the last; `weekday` follows `std/time`
+## (`epoch_to_date` convention, Sunday is 0). When `dst_start_utc` is 1
+## the start hour is already UTC (e.g. EU rules); otherwise it is local
+## wall time (start uses the standard offset, end uses the daylight
+## offset). Southern-hemisphere zones set the start month after the end
+## month (e.g. October start, April end).
+##
+## ### Fields
+## - `name`: IANA zone name (`"Europe/Istanbul"`).
+## - `std_abbr`: Standard-time abbreviation (`"EST"`, `"+03"`).
+## - `dst_abbr`: Daylight abbreviation (`"EDT"`; `""` when unused).
+## - `std_offset_min`: Standard offset, minutes east of UTC.
+## - `dst_offset_min`: Daylight offset, minutes east of UTC.
+## - `dst_start_month`: DST start month (1-12), 0 for fixed zones.
+## - `dst_start_week`: Start week (1-4 nth, 5 last).
+## - `dst_start_weekday`: Start weekday (0 Sunday .. 6 Saturday).
+## - `dst_start_hour`: Start transition hour (0-23).
+## - `dst_start_utc`: 1 when the start hour is UTC, 0 when local wall.
+## - `dst_end_month`: DST end month (1-12), 0 for fixed zones.
+## - `dst_end_week`: End week (1-4 nth, 5 last).
+## - `dst_end_weekday`: End weekday (0 Sunday .. 6 Saturday).
+## - `dst_end_hour`: End transition hour (0-23).
+## - `dst_end_utc`: 1 when the end hour is UTC, 0 when local wall.
+pub struct TzRule
     name: string,
-    count: int,
-    priority: int,
-    style: int,
-    enabled: int,
-    tags: array
+    std_abbr: string,
+    dst_abbr: string,
+    std_offset_min: int,
+    dst_offset_min: int,
+    dst_start_month: int,
+    dst_start_week: int,
+    dst_start_weekday: int,
+    dst_start_hour: int,
+    dst_start_utc: int,
+    dst_end_month: int,
+    dst_end_week: int,
+    dst_end_weekday: int,
+    dst_end_hour: int,
+    dst_end_utc: int
 end
 
-## Container representing the outcome of an operation.
-##
-## Holds an optional payload value, numeric status code, informational message,
-## and accumulated error diagnostic messages.
-##
-## ### Fields
-## - `value`: Result payload (any type, or null on failure).
-## - `status`: Outcome code (0 for success, non-zero for errors).
-## - `message`: Human-readable summary or error explanation.
-## - `errors`: Diagnostic error messages array.
-pub struct TzResult
-    value,
-    status: int,
-    message: string,
-    errors: array
-end
-
-## Aggregated run statistics tracking test, processing, or batch metrics.
-##
-## Records total observed items, successes, failures, and skipped items.
-##
-## ### Fields
-## - `total`: Total processed items count.
-## - `passed`: Succeeded items count.
-## - `failed`: Failed items count.
-## - `skipped`: Skipped items count.
-pub struct TzStats
-    total: int,
-    passed: int,
-    failed: int,
-    skipped: int
-end
-
-# ───────────────────────────────────────────────────────────────
-# Private Helper Functions
-# ───────────────────────────────────────────────────────────────
-
-# Internal sanitizer ensuring a non-empty, non-null string fallback.
-function sanitize_text_internal(text, fallback: string) -> string
-    return when
-        text is null => fallback
-        text == ""   => fallback
-        else         => text
-    end
-end
-
-# Formats integer division as a percentage string, clamping denominator zero.
-function format_percent_internal(passed: int, total: int) -> string
-    if total <= 0
-        return "0%"
-    end
-    let pct = (passed * 100) / total
-    return "{pct}%"
-end
-
-# ───────────────────────────────────────────────────────────────
-# Public Sanitization and Factory Constructors
-# ───────────────────────────────────────────────────────────────
-
-## Validates and sanitizes a candidate name string.
-##
-## Replaces null or empty strings with the default `"World"` fallback.
+## Factory constructor for a fixed-offset zone (no daylight saving).
 ##
 ## ### Parameters
-## - `name`: The candidate name value to sanitize.
+## - `name`: IANA zone name.
+## - `abbr`: Zone abbreviation.
+## - `offset_min`: Offset minutes east of UTC.
 ##
 ## ### Returns
-## The validated string value, or `"World"` if empty or null.
+## A fixed `TzRule` with DST fields zeroed.
 ##
 ## ### Examples
 ## ```alya
-## let clean = sanitize_name(null) # "World"
-## let user = sanitize_name("Alice") # "Alice"
+## let r = fixed_rule("Asia/Tokyo", "JST", 540)
 ## ```
-pub function sanitize_name(name) -> string
-    return sanitize_text_internal(name, "World")
-end
-
-## Factory constructor creating a validated `TzConfig` instance.
-##
-## Sanitizes the input name and sets sensible defaults for optional fields.
-##
-## ### Parameters
-## - `name`: Entity identifier name. Defaults to `"World"`.
-## - `count`: Counter or repetition limit. Defaults to `1`.
-## - `priority`: Priority tier. Defaults to `TzPriority.Normal`.
-## - `style`: Presentation style variant. Defaults to `TzStyle.Standard`.
-## - `enabled`: Active flag. Defaults to `1`.
-## - `tags`: Categorization tags array. Defaults to `[]`.
-##
-## ### Returns
-## A fully initialized `TzConfig` instance.
-##
-## ### Examples
-## ```alya
-## let cfg = make_config("Alice", 3, TzPriority.High)
-## ```
-pub function make_config(name = "World", count: int = 1, priority: int = TzPriority.Normal, style: int = TzStyle.Standard, enabled: int = 1, tags: array = []) -> TzConfig
-    let valid_name = sanitize_name(name)
-    return TzConfig {
-        name: valid_name,
-        count: count,
-        priority: priority,
-        style: style,
-        enabled: enabled,
-        tags: tags
+pub function fixed_rule(name: string, abbr: string, offset_min: int) -> TzRule
+    return TzRule {
+        name: name,
+        std_abbr: abbr,
+        dst_abbr: "",
+        std_offset_min: offset_min,
+        dst_offset_min: offset_min,
+        dst_start_month: 0,
+        dst_start_week: 0,
+        dst_start_weekday: 0,
+        dst_start_hour: 0,
+        dst_start_utc: 0,
+        dst_end_month: 0,
+        dst_end_week: 0,
+        dst_end_weekday: 0,
+        dst_end_hour: 0,
+        dst_end_utc: 0
     }
 end
 
-## Factory constructor creating a successful `TzResult`.
+## Factory constructor for a daylight-saving zone.
 ##
 ## ### Parameters
-## - `value`: The success payload to encapsulate.
-## - `message`: Descriptive success message string. Defaults to `"OK"`.
+## - `name`: IANA zone name.
+## - `std_abbr`: Standard-time abbreviation.
+## - `dst_abbr`: Daylight abbreviation.
+## - `std_offset_min`: Standard offset, minutes east of UTC.
+## - `dst_offset_min`: Daylight offset, minutes east of UTC.
+## - `sm`: DST start month (1-12).
+## - `sw`: Start week (1-4 nth, 5 last).
+## - `sd`: Start weekday (0 Sunday .. 6 Saturday).
+## - `sh`: Start transition hour (0-23).
+## - `su`: 1 when the start hour is UTC, 0 when local wall.
+## - `em`: DST end month (1-12).
+## - `ew`: End week (1-4 nth, 5 last).
+## - `ed`: End weekday (0 Sunday .. 6 Saturday).
+## - `eh`: End transition hour (0-23).
+## - `eu`: 1 when the end hour is UTC, 0 when local wall.
 ##
 ## ### Returns
-## A `TzResult` with status `0` and empty errors array.
-##
-## ### Examples
-## ```alya
-## let res = ok_result("Processed data", "Success")
-## ```
-pub function ok_result(value, message: string = "OK") -> TzResult
-    return TzResult {
-        value: value,
-        status: 0,
-        message: message,
-        errors: []
+## A daylight-saving `TzRule`.
+pub function dst_rule(name: string, std_abbr: string, dst_abbr: string, std_offset_min: int, dst_offset_min: int, sm: int, sw: int, sd: int, sh: int, su: int, em: int, ew: int, ed: int, eh: int, eu: int) -> TzRule
+    return TzRule {
+        name: name,
+        std_abbr: std_abbr,
+        dst_abbr: dst_abbr,
+        std_offset_min: std_offset_min,
+        dst_offset_min: dst_offset_min,
+        dst_start_month: sm,
+        dst_start_week: sw,
+        dst_start_weekday: sd,
+        dst_start_hour: sh,
+        dst_start_utc: su,
+        dst_end_month: em,
+        dst_end_week: ew,
+        dst_end_weekday: ed,
+        dst_end_hour: eh,
+        dst_end_utc: eu
     }
 end
 
-## Factory constructor creating a failed `TzResult`.
+## Returns 1 when the rule carries a daylight-saving schedule, 0 for fixed zones.
 ##
 ## ### Parameters
-## - `message`: Descriptive error message string.
-## - `errors`: Diagnostic error details array. Defaults to `[]`.
+## - `self`: Zone rule inspected.
 ##
 ## ### Returns
-## A `TzResult` with status `1` and null value payload.
-##
-## ### Examples
-## ```alya
-## let err = error_result("Validation failed", ["Name is missing"])
-## ```
-pub function error_result(message: string, errors: array = []) -> TzResult
-    return TzResult {
-        value: null,
-        status: 1,
-        message: message,
-        errors: errors
-    }
-end
-
-## Factory constructor creating a `TzStats` metric record.
-##
-## ### Parameters
-## - `total`: Total observed items count.
-## - `passed`: Succeeded items count.
-## - `failed`: Failed items count.
-## - `skipped`: Skipped items count. Defaults to `0`.
-##
-## ### Returns
-## A populated `TzStats` record.
-##
-## ### Examples
-## ```alya
-## let stats = make_stats(100, 95, 5, 0)
-## ```
-pub function make_stats(total: int, passed: int, failed: int, skipped: int = 0) -> TzStats
-    return TzStats {
-        total: total,
-        passed: passed,
-        failed: failed,
-        skipped: skipped
-    }
-end
-
-# ───────────────────────────────────────────────────────────────
-# Struct Methods: TzConfig
-# ───────────────────────────────────────────────────────────────
-
-## Returns a formatted single-line string summary of this configuration.
-##
-## Implicitly satisfies the `Summarizable` interface.
-##
-## ### Parameters
-## - `self`: The target `TzConfig` instance.
-##
-## ### Returns
-## Formatted summary string in the form `"{name} (count: {count}, enabled: {enabled})"`.
-pub function TzConfig.summary(self: TzConfig) -> string
-    let active_str = when self.enabled
-        is 1 => "active"
-        else => "disabled"
-    end
-    return "{self.name} (count: {self.count}, {active_str})"
-end
-
-## Returns a detailed multi-attribute description of this configuration.
-##
-## Implicitly satisfies the `Describable` interface.
-##
-## ### Parameters
-## - `self`: The target `TzConfig` instance.
-##
-## ### Returns
-## Detailed descriptive string including priority and style codes.
-pub function TzConfig.describe(self: TzConfig) -> string
-    return "[Config] name={self.name}, count={self.count}, priority={self.priority}, style={self.style}"
-end
-
-## Validates whether this configuration conforms to essential operational constraints.
-##
-## Implicitly satisfies the `Describable` interface.
-##
-## ### Parameters
-## - `self`: The target `TzConfig` instance.
-##
-## ### Returns
-## `1` if valid (non-empty name and count >= 0), `0` otherwise.
-pub function TzConfig.is_valid(self: TzConfig) -> int
-    if self.name == "" or self.count < 0
+## 1 when `dst_start_month` is non-zero, 0 otherwise.
+pub function TzRule.has_dst(self: TzRule) -> int
+    if self.dst_start_month == 0
         return 0
     end
     return 1
-end
-
-## Returns 1 if this configuration is enabled, 0 otherwise.
-##
-## ### Parameters
-## - `self`: The target `TzConfig` instance.
-##
-## ### Returns
-## `1` when enabled, `0` when disabled.
-pub function TzConfig.is_enabled(self: TzConfig) -> int
-    return self.enabled
-end
-
-## Returns a new configuration copy with an updated name.
-##
-## ### Parameters
-## - `self`: The current `TzConfig` instance.
-## - `new_name`: The replacement name string.
-##
-## ### Returns
-## A new `TzConfig` instance with updated name.
-pub function TzConfig.with_name(self: TzConfig, new_name) -> TzConfig
-    return TzConfig {
-        name: sanitize_name(new_name),
-        count: self.count,
-        priority: self.priority,
-        style: self.style,
-        enabled: self.enabled,
-        tags: self.tags
-    }
-end
-
-## Returns a new configuration copy with an updated priority level.
-##
-## ### Parameters
-## - `self`: The current `TzConfig` instance.
-## - `new_priority`: New priority level from `TzPriority`.
-##
-## ### Returns
-## A new `TzConfig` instance with updated priority.
-pub function TzConfig.with_priority(self: TzConfig, new_priority: int) -> TzConfig
-    return TzConfig {
-        name: self.name,
-        count: self.count,
-        priority: new_priority,
-        style: self.style,
-        enabled: self.enabled,
-        tags: self.tags
-    }
-end
-
-# ───────────────────────────────────────────────────────────────
-# Struct Methods: TzResult
-# ───────────────────────────────────────────────────────────────
-
-## Returns 1 if this result represents a successful operation.
-##
-## ### Parameters
-## - `self`: The target `TzResult` instance.
-##
-## ### Returns
-## `1` when status is `0`, `0` otherwise.
-pub function TzResult.is_ok(self: TzResult) -> int
-    if self.status == 0
-        return 1
-    end
-    return 0
-end
-
-## Returns 1 if this result represents an error condition.
-##
-## ### Parameters
-## - `self`: The target `TzResult` instance.
-##
-## ### Returns
-## `1` when status is non-zero, `0` when status is `0`.
-pub function TzResult.is_error(self: TzResult) -> int
-    if self.status != 0
-        return 1
-    end
-    return 0
-end
-
-## Unwraps the result's message string, or returns a fallback string on error.
-##
-## ### Parameters
-## - `self`: The target `TzResult` instance.
-## - `fallback`: Alternative string returned if this result represents an error.
-##
-## ### Returns
-## `message` on success, or `fallback` on error.
-pub function TzResult.unwrap_or(self: TzResult, fallback: string) -> string
-    if self.status == 0
-        return self.message
-    end
-    return fallback
-end
-
-# ───────────────────────────────────────────────────────────────
-# Struct Methods: TzStats
-# ───────────────────────────────────────────────────────────────
-
-## Returns the total number of checked items (passed + failed).
-##
-## ### Parameters
-## - `self`: The target `TzStats` instance.
-##
-## ### Returns
-## Integer sum of passed and failed items.
-pub function TzStats.total_checked(self: TzStats) -> int
-    return self.passed + self.failed
-end
-
-## Computes and returns the success rate percentage as a formatted string.
-##
-## ### Parameters
-## - `self`: The target `TzStats` instance.
-##
-## ### Returns
-## Formatted percentage string (e.g. `"90%"`).
-pub function TzStats.success_rate(self: TzStats) -> string
-    let checked = self.passed + self.failed
-    return format_percent_internal(self.passed, checked)
 end

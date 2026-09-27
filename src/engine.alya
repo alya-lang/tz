@@ -1,0 +1,239 @@
+## tz Conversion Engine
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Zone-aware conversion over `std/time` (UTC epoch arithmetic) and the
+## bundled rule table in `./tzdata/zones.alya`.
+
+import "std/time"
+import "./types.alya"
+import "./tzdata/zones.alya"
+
+# --- Lookup ---
+
+## Resolves a zone name or alias to its rule, or null when unknown.
+##
+## ### Parameters
+## - `name`: IANA zone name or alias (`"UTC"` resolves to `"Etc/UTC"`).
+##
+## ### Returns
+## The matching `TzRule`, or null when the zone is not bundled.
+##
+## ### Examples
+## ```alya
+## let r = tz_rule("Europe/Istanbul")
+## ```
+pub function engine_tz_rule(name: string)
+    let cname = tzdata_canonical(name)
+    for r in tzdata_rules()
+        if r.name == cname
+            return r
+        end
+    end
+    return null
+end
+
+## Returns 1 when the zone name or alias is bundled, 0 otherwise.
+##
+## ### Parameters
+## - `name`: IANA zone name or alias.
+##
+## ### Returns
+## 1 for known zones, 0 otherwise.
+pub function engine_tz_is_valid(name: string) -> int
+    if engine_tz_rule(name) is null
+        return 0
+    end
+    return 1
+end
+
+## Returns all bundled IANA zone names.
+##
+## ### Parameters
+## None.
+##
+## ### Returns
+## Array of bundled zone name strings.
+pub function engine_tz_names() -> array
+    let res = []
+    for r in tzdata_rules()
+        res.push(r.name)
+    end
+    return res
+end
+
+function _tz_require(name: string)
+    let r = engine_tz_rule(name)
+    if r is null
+        throw TzError { message: f"Unknown timezone: {name}" }
+    end
+    return r
+end
+
+# --- Transition Math ---
+
+function _tz_nth_weekday(year: int, month: int, week: int, weekday: int) -> int
+    let dim: int = days_in_month(month, year)
+    let first_wd: int = epoch_to_date(date_ymd_to_epoch(year, month, 1))["weekday"]
+    let delta: int = (weekday - first_wd) % 7
+    if delta < 0
+        delta += 7
+    end
+    let day: int = 1 + delta
+    if week >= 5
+        while day + 7 <= dim
+            day += 7
+        end
+        return day
+    end
+    day = day + (week - 1) * 7
+    if day > dim
+        day = day - 7
+    end
+    return day
+end
+
+function _tz_transition_utc(rule, year: int, is_start: int) -> int
+    let month: int = rule.dst_end_month
+    let week: int = rule.dst_end_week
+    let weekday: int = rule.dst_end_weekday
+    let hour: int = rule.dst_end_hour
+    let as_utc: int = rule.dst_end_utc
+    let base_min: int = rule.dst_offset_min
+    if is_start == 1
+        month = rule.dst_start_month
+        week = rule.dst_start_week
+        weekday = rule.dst_start_weekday
+        hour = rule.dst_start_hour
+        as_utc = rule.dst_start_utc
+        base_min = rule.std_offset_min
+    end
+    let day: int = _tz_nth_weekday(year, month, week, weekday)
+    let civil: int = date_ymd_to_epoch(year, month, day) + (hour * 3600)
+    if as_utc == 1
+        return civil
+    end
+    return civil - base_min * 60
+end
+
+# --- Offsets ---
+
+## Returns the UTC offset in minutes active in the zone at the epoch.
+##
+## ### Parameters
+## - `name`: IANA zone name or alias.
+## - `epoch`: UTC epoch seconds.
+##
+## ### Returns
+## Offset minutes east of UTC (UTC+3 -> 180).
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function engine_tz_offset_min(name: string, epoch: int) -> int
+    let rule = _tz_require(name)
+    if rule.has_dst() == 0
+        return rule.std_offset_min
+    end
+    let year: int = epoch_to_date(epoch)["year"]
+    let start_utc: int = _tz_transition_utc(rule, year, 1)
+    let end_utc: int = _tz_transition_utc(rule, year, 0)
+    if rule.dst_start_month <= rule.dst_end_month
+        if epoch >= start_utc and epoch < end_utc
+            return rule.dst_offset_min
+        end
+        return rule.std_offset_min
+    end
+    if epoch >= start_utc or epoch < end_utc
+        return rule.dst_offset_min
+    end
+    return rule.std_offset_min
+end
+
+## Returns the zone abbreviation active in the zone at the epoch.
+##
+## ### Parameters
+## - `name`: IANA zone name or alias.
+## - `epoch`: UTC epoch seconds.
+##
+## ### Returns
+## Active abbreviation (`"EST"`/`"EDT"`, `""` for fixed zones without one).
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function engine_tz_abbrev(name: string, epoch: int) -> string
+    let rule = _tz_require(name)
+    if rule.has_dst() == 0
+        return rule.std_abbr
+    end
+    if engine_tz_offset_min(name, epoch) == rule.dst_offset_min
+        return rule.dst_abbr
+    end
+    return rule.std_abbr
+end
+
+# --- Conversions ---
+
+## Converts a UTC epoch to a zoned calendar map.
+##
+## ### Parameters
+## - `epoch`: UTC epoch seconds.
+## - `name`: IANA zone name or alias.
+##
+## ### Returns
+## Calendar map (`year`, `month`, `day`, `hour`, `minute`, `second`,
+## `weekday` with Sunday 0) plus `offset_min`, `abbr`, and `iana`.
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+##
+## ### Examples
+## ```alya
+## let z = epoch_to_zoned(1704067200, "Asia/Shanghai")
+## # z["hour"] == 8
+## ```
+pub function engine_epoch_to_zoned(epoch: int, name: string)
+    let rule = _tz_require(name)
+    let off: int = engine_tz_offset_min(name, epoch)
+    let local = epoch_to_date(epoch + off * 60)
+    local["offset_min"] = off
+    if off == rule.dst_offset_min and rule.has_dst() == 1
+        local["abbr"] = rule.dst_abbr
+    else
+        local["abbr"] = rule.std_abbr
+    end
+    local["iana"] = rule.name
+    return local
+end
+
+## Converts a zoned wall-time map to a UTC epoch.
+##
+## A single correction pass resolves the wall reading against the active
+## offset: spring-forward gaps resolve forward, fall-back folds resolve to
+## the standard-time (second) occurrence.
+##
+## ### Parameters
+## - `d`: Calendar map with `year`, `month`, `day`, `hour`, `minute`, and `second`.
+## - `name`: IANA zone name or alias.
+##
+## ### Returns
+## UTC epoch seconds.
+##
+## ### Throws
+## `TzError` when the zone is not bundled or the calendar date is invalid.
+pub function engine_zoned_to_epoch(d, name: string) -> int
+    let rule = _tz_require(name)
+    let year = d["year"]
+    let month = d["month"]
+    let day = d["day"]
+    if month < 1 or month > 12 or day < 1 or day > days_in_month(month, year)
+        throw TzError { message: "Invalid calendar date for zoned conversion" }
+    end
+    let civil: int = date_ymd_to_epoch(year, month, day) + (d["hour"] * 3600) + (d["minute"] * 60) + d["second"]
+    let guess: int = civil - rule.std_offset_min * 60
+    let actual: int = engine_tz_offset_min(name, guess)
+    let epoch: int = civil - actual * 60
+    let recheck: int = engine_tz_offset_min(name, epoch)
+    if recheck != actual
+        epoch = civil - recheck * 60
+    end
+    return epoch
+end

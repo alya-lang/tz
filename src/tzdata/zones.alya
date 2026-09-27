@@ -1,0 +1,89 @@
+## tz/tzdata: bundled zone table (current-era recurring rules)
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Mirrors the role of V's `time.tzdata`: embedded data backing the engine
+## in `../engine.alya`. Rules are recurring current-era schedules, not full
+## IANA histories: fixed zones are exact going forward, DST zones follow
+## their post-2007 (US) / post-1996 (EU) / current southern rules.
+## Pre-changeover historical dates are out of scope for v0.1.0.
+
+import "../types.alya"
+
+## Returns the bundled zone rule table.
+##
+## ### Parameters
+## None.
+##
+## ### Returns
+## Array of `TzRule` covering the v0.1.0 zone set.
+pub function tzdata_rules() -> array
+    return [
+        fixed_rule("Etc/UTC", "UTC", 0),
+        fixed_rule("Europe/Istanbul", "+03", 180),
+        fixed_rule("Europe/Moscow", "MSK", 180),
+        fixed_rule("Asia/Dubai", "+04", 240),
+        fixed_rule("Asia/Karachi", "PKT", 300),
+        fixed_rule("Asia/Kolkata", "IST", 330),
+        fixed_rule("Asia/Dhaka", "+06", 360),
+        fixed_rule("Asia/Amman", "+03", 180),
+        fixed_rule("Asia/Singapore", "+08", 480),
+        fixed_rule("Asia/Shanghai", "CST", 480),
+        fixed_rule("Asia/Hong_Kong", "HKT", 480),
+        fixed_rule("Asia/Taipei", "CST", 480),
+        fixed_rule("Asia/Seoul", "KST", 540),
+        fixed_rule("Asia/Tokyo", "JST", 540),
+        fixed_rule("Australia/Perth", "AWST", 480),
+        fixed_rule("Australia/Darwin", "ACST", 570),
+        fixed_rule("Pacific/Honolulu", "HST", 0 - 600),
+        fixed_rule("America/Phoenix", "MST", 0 - 420),
+        fixed_rule("America/Mexico_City", "CST", 0 - 360),
+        fixed_rule("America/Bogota", "-05", 0 - 300),
+        fixed_rule("America/Lima", "-05", 0 - 300),
+        fixed_rule("America/Sao_Paulo", "-03", 0 - 180),
+        fixed_rule("America/Argentina/Buenos_Aires", "-03", 0 - 180),
+        fixed_rule("Africa/Lagos", "WAT", 60),
+        fixed_rule("Africa/Johannesburg", "SAST", 120),
+        fixed_rule("Africa/Nairobi", "EAT", 180),
+        dst_rule("America/New_York", "EST", "EDT", 0 - 300, 0 - 240, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Chicago", "CST", "CDT", 0 - 360, 0 - 300, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Denver", "MST", "MDT", 0 - 420, 0 - 360, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Los_Angeles", "PST", "PDT", 0 - 480, 0 - 420, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Anchorage", "AKST", "AKDT", 0 - 540, 0 - 480, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Toronto", "EST", "EDT", 0 - 300, 0 - 240, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Vancouver", "PST", "PDT", 0 - 480, 0 - 420, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Halifax", "AST", "ADT", 0 - 240, 0 - 180, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("Europe/London", "GMT", "BST", 0, 60, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Lisbon", "WET", "WEST", 0, 60, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Atlantic/Azores", "AZOT", "AZOST", 0 - 60, 0, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Berlin", "CET", "CEST", 60, 120, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Paris", "CET", "CEST", 60, 120, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Rome", "CET", "CEST", 60, 120, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Madrid", "CET", "CEST", 60, 120, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Amsterdam", "CET", "CEST", 60, 120, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Zurich", "CET", "CEST", 60, 120, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Vienna", "CET", "CEST", 60, 120, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Prague", "CET", "CEST", 60, 120, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Warsaw", "CET", "CEST", 60, 120, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Athens", "EET", "EEST", 120, 180, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Helsinki", "EET", "EEST", 120, 180, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Europe/Chisinau", "EET", "EEST", 120, 180, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Australia/Sydney", "AEST", "AEDT", 600, 660, 10, 1, 0, 2, 0, 4, 1, 0, 3, 0),
+        dst_rule("Australia/Melbourne", "AEST", "AEDT", 600, 660, 10, 1, 0, 2, 0, 4, 1, 0, 3, 0),
+        dst_rule("Pacific/Auckland", "NZST", "NZDT", 720, 780, 9, 5, 0, 2, 0, 4, 1, 0, 3, 0),
+        dst_rule("Africa/Cairo", "EET", "EEST", 120, 180, 4, 5, 5, 0, 0, 10, 5, 4, 0, 0)
+    ]
+end
+
+## Resolves well-known aliases to canonical IANA names.
+##
+## ### Parameters
+## - `name`: Candidate zone name or alias.
+##
+## ### Returns
+## Canonical name when `name` is a known alias, otherwise `name` unchanged.
+pub function tzdata_canonical(name: string) -> string
+    if name == "UTC" or name == "UCT" or name == "Universal" or name == "Zulu"
+        return "Etc/UTC"
+    end
+    return name
+end

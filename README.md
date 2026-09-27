@@ -11,14 +11,13 @@ IANA timezone database and zone-aware datetime conversion for Alya
 
 ## 🌟 Features
 
-- ⚡ **Lightweight & High Performance**: Minimal memory overhead, zero runtime bloat, and fast native execution
-- 🧩 **Modular Architecture**: Layered multi-module design featuring a clean public facade (`src/lib.alya`), rich data models (`src/types.alya`), and encapsulated core formatters (`src/core/formatter.alya`)
-- 🔒 **Public/Private Visibility (`pub`)**: Fine-grained export control with `pub` for public functions, structs, and enums, keeping internal helper functions private and encapsulated
-- 🎭 **Structural Duck Typing & Interfaces**: Dynamic interface dispatch (`Summarizable`, `Describable`) without brittle inheritance hierarchies
-- 📦 **Rich Domain Models & Enums**: Idiomatic `enum` types (`TzStatus`, `TzPriority`, `TzStyle`) and typed data containers (`TzConfig`, `TzResult`, `TzStats`)
-- 🎯 **Advanced Pattern Matching**: Clean branching with `when` expressions, range matching, and condition guards
-- 🛡️ **Defensive Result Pattern**: Structured error handling and outcome encapsulation with `ok_result` and `error_result`
-- 🧪 **Enterprise Test & Benchmark Suite**: 100% test coverage with standard assertions (`std/test`) and micro-benchmarking (`std/test` bench runner)
+- 🌍 **53 Bundled IANA Zones**: Fixed-offset zones (exact) plus recurring current-era DST rules (US, EU, Australia, New Zealand, Egypt)
+- ⏰ **Zone-Aware Conversion**: `epoch_to_zoned` / `zoned_to_epoch` roundtrips over `std/time`, with gap/fold documented behavior
+- 📏 **Offset & Abbreviation Lookup**: `tz_offset_min` / `tz_abbrev` evaluated at any UTC epoch (transition-second precision)
+- 🧩 **Modular Architecture**: Clean public facade (`src/lib.alya`), rule model (`src/types.alya`), conversion engine (`src/engine.alya`), embedded data (`src/tzdata/zones.alya`)
+- 🔒 **Public/Private Visibility (`pub`)**: Engine internals (`engine_*`, `tzdata_*`) stay out of the facade; consumers use the documented API
+- 🛡️ **Structured Errors**: Unknown zones and invalid dates throw `TzError`, caught with standard `try`/`catch`
+- 🧪 **Test & Benchmark Suite**: 66 assertions (`std/test`) covering transitions, roundtrips, and error paths, plus micro-benchmarks
 
 ---
 
@@ -31,23 +30,22 @@ tz/
 ├── .gitignore              # Ecosystem standard ignore filters
 ├── .vscode/                # VS Code workspace settings, DAP launch configurations & tasks
 ├── alya.toml               # Package manifest with dependencies and optional [build]
-├── c/                      # (Optional) Native C sources for zero-dependency FFI packages
 ├── src/
-│   ├── lib.alya            # Public API facade (pub exports, re-exports & pipeline runners)
-│   ├── types.alya          # Data models, pub enums, pub structs, and struct methods
-│   ├── ffi.alya            # (Optional) Native extern "C" declarations
-│   └── core/               # Subdirectory module hierarchy
-│       └── formatter.alya  # Domain formatting routines, salutation builders & pattern matchers
+│   ├── lib.alya            # Public API facade (tz_offset_min, epoch_to_zoned, zoned_to_epoch, ...)
+│   ├── types.alya          # TzRule / TzError models, fixed_rule / dst_rule factories
+│   ├── engine.alya         # Offset engine, transition math, conversions (engine_* internals)
+│   └── tzdata/             # Embedded zone table (mirrors V's time.tzdata role)
+│       └── zones.alya      # 53 bundled rules + alias canonicalization
 ├── examples/
-│   └── demo.alya           # Comprehensive runnable walkthrough of all package capabilities
+│   └── demo.alya           # Runnable walkthrough of all package capabilities
 ├── tests/
-│   └── test_basic.alya     # Automated test suite with 100% feature coverage
+│   └── test_basic.alya     # Automated test suite (66 assertions)
 └── benches/
-    └── bench_basic.alya    # Micro-benchmarks measuring performance and throughput
+    └── bench_basic.alya    # Micro-benchmarks measuring conversion throughput
 ```
 
 > [!NOTE]
-> **Visibility & Modularity:** Symbols annotated with `pub` (`pub function`, `pub struct`, `pub enum`, `pub interface`) are exported to external consumers and re-exporting modules. Symbols without `pub` remain strictly internal to their declaring module, preventing symbol collisions and implementation leakage.
+> **Visibility & Modularity:** Symbols annotated with `pub` (`pub function`, `pub struct`) are exported to external consumers and re-exporting modules. Symbols without `pub` remain strictly internal to their declaring module, preventing symbol collisions and implementation leakage.
 
 ---
 
@@ -75,18 +73,16 @@ alya install
 import "tz" as pkg
 
 function main()
-    # 1. Basic facade call with default parameter
-    let greeting = pkg::hello()
-    say f"Greeting:  {greeting}"
+    # Wall time in Shanghai for a known UTC instant (V README example)
+    let z = pkg::epoch_to_zoned(1704067200, "Asia/Shanghai")
+    say z["hour"] # 8
 
-    # 2. Struct configuration with priority, style, and methods
-    let cfg = pkg::new_config("Community", 5, pkg::TzPriority.High, pkg::TzStyle.Formal)
-    say f"Summary:   {cfg.summary()}"
-    say f"Formatted: {pkg::core_format_custom(cfg)}"
+    # DST-aware offset: EST in January, EDT in July
+    say pkg::tz_offset_min("America/New_York", 1704067200) # -300
+    say pkg::tz_offset_min("America/New_York", 1721068245) # -240
 
-    # 3. Processing pipeline returning Result model
-    let res = pkg::process("Analytics", 3, pkg::TzPriority.Critical)
-    say f"Outcome:   {res.message}"
+    # Back to epoch
+    say pkg::zoned_to_epoch(z, "Asia/Shanghai") # 1704067200
 end
 
 main()
@@ -98,44 +94,22 @@ main()
 
 | Symbol | Visibility | Description |
 |---|---|---|
-| `hello(name = "World")` | `pub function` | Returns a formatted greeting string. Defaults to `"World"` if null or empty. |
-| `new_config(name, count, priority, style)` | `pub function` | Factory constructing a `TzConfig` with sensible defaults. |
-| `make_config(name, count, priority, style, enabled, tags)` | `pub function` | Full constructor for `TzConfig`. |
-| `process(label, count, priority)` | `pub function` | Runs processing pipeline, returning an `ok_result` `TzResult`. |
-| `process_batch(labels)` | `pub function` | Formats an array of labels in batch, returning an array of strings. |
-| `ok_result(value, message)` | `pub function` | Constructs a successful `TzResult` container (`status = 0`). |
-| `error_result(message, errors)` | `pub function` | Constructs a failed `TzResult` container (`status = 1`). |
-| `make_stats(total, passed, failed, skipped)` | `pub function` | Constructs a `TzStats` metrics record. |
-| `format_summary(cfg)` | `pub function` | Formats summary of a config instance (satisfies `Summarizable`). |
-| `format_description(cfg)` | `pub function` | Formats description of a config instance (satisfies `Describable`). |
-| `format_config(config)` | `pub function` | Multi-field formatter producing descriptive overview of a `TzConfig`. |
-| `format_result(result)` | `pub function` | Formats a `TzResult` into `[OK]` or `[ERROR]` status line. |
-| `format_stats(stats)` | `pub function` | Formats total checked items and success rate percentage. |
-| `clamp(n, min_val, max_val)` | `pub function` | Clamps an integer value to the closed range `[min_val, max_val]`. |
-| `pluralize(n, singular, plural)` | `pub function` | Pattern-matches count to return singular or plural noun form. |
-| `repeat_string(label, count)` | `pub function` | Repeats a string into an array of `count` items. |
-| `Summarizable` | `pub interface` | Structural contract requiring `summary(self) -> string`. |
-| `Describable` | `pub interface` | Structural contract requiring `describe(self) -> string` and `is_valid(self) -> int`. |
-| `TzStatus` | `pub enum` | Lifecycle status codes (`Pending = 0`, `Active = 1`, `Archived = 2`, `Error = 3`). |
-| `TzPriority` | `pub enum` | Priority tiers (`Low = 0`, `Normal = 1`, `High = 2`, `Critical = 3`). |
-| `TzStyle` | `pub enum` | Presentation styles (`Standard = 0`, `Formal = 1`, `Casual = 2`). |
-| `TzConfig` | `pub struct` | Primary configuration model (`name`, `count`, `priority`, `style`, `enabled`, `tags`). |
-| `TzConfig.summary()` | `pub method` | Single-line formatted summary (satisfies `Summarizable`). |
-| `TzConfig.describe()` | `pub method` | Detailed multi-field description (satisfies `Describable`). |
-| `TzConfig.is_valid()` | `pub method` | Validation guard returning 1 if valid, 0 otherwise. |
-| `TzConfig.is_enabled()` | `pub method` | Returns 1 if active, 0 if disabled. |
-| `TzConfig.with_name(new_name)` | `pub method` | Immutable copy with updated name. |
-| `TzConfig.with_priority(new_prio)` | `pub method` | Immutable copy with updated priority tier. |
-| `TzResult` | `pub struct` | Operation outcome model (`value`, `status`, `message`, `errors`). |
-| `TzResult.is_ok()` | `pub method` | Returns 1 if successful (`status == 0`), 0 otherwise. |
-| `TzResult.is_error()` | `pub method` | Returns 1 if error (`status != 0`), 0 otherwise. |
-| `TzResult.unwrap_or(fallback)` | `pub method` | Returns message on success, or fallback on error. |
-| `TzStats` | `pub struct` | Run statistics model (`total`, `passed`, `failed`, `skipped`). |
-| `TzStats.total_checked()` | `pub method` | Sum of passed and failed items count. |
-| `TzStats.success_rate()` | `pub method` | Computed percentage string (e.g. `"95%"`). |
+| `tz_offset_min(name, epoch)` | `pub function` | UTC offset in minutes east of UTC active at the epoch. Throws `TzError` for unknown zones. |
+| `tz_abbrev(name, epoch)` | `pub function` | Active zone abbreviation (`"EST"`/`"EDT"`). Throws `TzError` for unknown zones. |
+| `epoch_to_zoned(epoch, name)` | `pub function` | UTC epoch to zoned calendar map (`year`..`weekday` plus `offset_min`, `abbr`, `iana`). Throws `TzError` for unknown zones. |
+| `zoned_to_epoch(d, name)` | `pub function` | Zoned wall-time map to UTC epoch (gaps resolve forward, folds to standard-time occurrence). Throws `TzError` for unknown zones or invalid dates. |
+| `tz_rule(name)` | `pub function` | Zone rule lookup, or null when the zone is not bundled. |
+| `tz_is_valid(name)` | `pub function` | 1 for bundled zones/aliases, 0 otherwise. |
+| `tz_names()` | `pub function` | Array of all 53 bundled IANA zone names. |
+| `tz_canonical(name)` | `pub function` | Alias canonicalization (`"UTC"` → `"Etc/UTC"`). |
+| `TzRule` | `pub struct` | Zone rule model (offsets, recurring DST schedule, UTC/local transition flags). |
+| `TzRule.has_dst()` | `pub method` | 1 for DST zones, 0 for fixed zones. |
+| `TzError` | `pub struct` | Thrown error (`message`). |
+| `fixed_rule(name, abbr, offset_min)` | `pub function` | Factory for fixed-offset zones. |
+| `dst_rule(name, std_abbr, dst_abbr, std, dst, sm, sw, sd, sh, su, em, ew, ed, eh, eu)` | `pub function` | Factory for DST zones (nth-weekday rules, UTC/local flags). |
 
 > [!TIP]
-> **Internal Helpers & Documentation:** Public symbols are documented with `##` Markdown docstrings, enabling automatic API documentation generation via `alya doc`. Private functions such as `build_salutation` and `build_priority_label` in `src/core/formatter.alya` are not annotated with `pub` and remain encapsulated within their respective modules.
+> **Scope:** Rules are recurring current-era schedules (US post-2007, EU post-1996). Fixed zones are exact going forward; pre-changeover historical dates are out of scope for v0.1.0. Public symbols are documented with `##` docstrings for `alya doc`.
 
 ---
 

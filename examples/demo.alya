@@ -1,6 +1,7 @@
 ## Example usage and walkthrough for tz
 ## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
 
+import "std/time"
 import "../src/lib.alya" as pkg
 
 function main()
@@ -8,145 +9,63 @@ function main()
     say ""
 
     # ───────────────────────────────────────────────────────────
-    # 1. Basic Facade Greeting
+    # 1. What time is it over there?
     # ───────────────────────────────────────────────────────────
-    say "--- 1. Facade Greeting ---"
-    let greeting_default = pkg::hello()
-    say "Default: " + greeting_default
-
-    let greeting_custom = pkg::hello("Alya Developer")
-    say "Custom:  " + greeting_custom
-    say ""
-
-    # ───────────────────────────────────────────────────────────
-    # 2. Enumeration Values
-    # ───────────────────────────────────────────────────────────
-    say "--- 2. Enumeration Values ---"
-    say "TzStatus.Pending  = " + str(pkg::TzStatus.Pending)
-    say "TzStatus.Active   = " + str(pkg::TzStatus.Active)
-    say "TzStatus.Archived = " + str(pkg::TzStatus.Archived)
-    say "TzStatus.Error    = " + str(pkg::TzStatus.Error)
-
-    say "TzPriority.Low      = " + str(pkg::TzPriority.Low)
-    say "TzPriority.Normal   = " + str(pkg::TzPriority.Normal)
-    say "TzPriority.High     = " + str(pkg::TzPriority.High)
-    say "TzPriority.Critical = " + str(pkg::TzPriority.Critical)
-
-    say "TzStyle.Standard = " + str(pkg::TzStyle.Standard)
-    say "TzStyle.Formal   = " + str(pkg::TzStyle.Formal)
-    say "TzStyle.Casual   = " + str(pkg::TzStyle.Casual)
-    say ""
-
-    # ───────────────────────────────────────────────────────────
-    # 3. Struct Models & Constructors
-    # ───────────────────────────────────────────────────────────
-    say "--- 3. Struct Models & Constructors ---"
-    let cfg = pkg::new_config("Community", 5, pkg::TzPriority.High, pkg::TzStyle.Formal)
-    say "Config Name:     " + cfg.name
-    say "Config Count:    " + str(cfg.count)
-    say "Config Priority: " + str(cfg.priority)
-    say "Config Style:    " + str(cfg.style)
-    say "Config Enabled:  " + str(cfg.enabled)
-
-    let stats = pkg::make_stats(100, 92, 6, 2)
-    say "Stats Total:     " + str(stats.total)
-    say "Stats Passed:    " + str(stats.passed)
-    say "Stats Failed:    " + str(stats.failed)
-    say "Stats Skipped:   " + str(stats.skipped)
-    say "Stats Checked:   " + str(stats.total_checked())
-    say "Stats Rate:      " + stats.success_rate()
-    say ""
-
-    # ───────────────────────────────────────────────────────────
-    # 4. Struct Methods & Immutability
-    # ───────────────────────────────────────────────────────────
-    say "--- 4. Struct Methods & Immutability ---"
-    say "Summary:         " + cfg.summary()
-    say "Description:     " + cfg.describe()
-    say "Is Valid:        " + str(cfg.is_valid())
-    say "Is Enabled:      " + str(cfg.is_enabled())
-
-    let updated_cfg = cfg.with_name("Core Contributors")
-    say "Updated Name:    " + updated_cfg.name
-    say "Original Name:   " + cfg.name
-
-    let critical_cfg = cfg.with_priority(pkg::TzPriority.Critical)
-    say "Updated Prio:    " + str(critical_cfg.priority)
-    say ""
-
-    # ───────────────────────────────────────────────────────────
-    # 5. Result Container Pattern
-    # ───────────────────────────────────────────────────────────
-    say "--- 5. Result Container Pattern ---"
-    let ok_res = pkg::ok_result(42, "Processed payload successfully")
-    say "Ok Result is_ok:    " + str(ok_res.is_ok())
-    say "Ok Result message:  " + ok_res.message
-    say "Ok Result unwrap:   " + ok_res.unwrap_or("fallback")
-
-    let err_res = pkg::error_result("Processing failed", ["Disk full", "Permission denied"])
-    say "Err Result is_err:  " + str(err_res.is_error())
-    say "Err Result message: " + err_res.message
-    say "Err Result unwrap:  " + err_res.unwrap_or("safe default")
-    say "Err Count:          " + str(len(err_res.errors))
-    say ""
-
-    # ───────────────────────────────────────────────────────────
-    # 6. Structural Duck Typing (Interfaces)
-    # ───────────────────────────────────────────────────────────
-    say "--- 6. Duck Typing (Interfaces) ---"
-    if cfg is pkg::Summarizable
-        say "Summarizable dispatch: " + pkg::format_summary(cfg)
-    end
-    if cfg is pkg::Describable
-        say "Describable dispatch:  " + pkg::format_description(cfg)
+    say "--- 1. Zone Wall Time ---"
+    let epoch = 1704067200
+    say "UTC instant:      " + format_iso(epoch)
+    for z in ["Asia/Shanghai", "Europe/Istanbul", "America/New_York", "Pacific/Auckland"]
+        let w = pkg::epoch_to_zoned(epoch, z)
+        say z + " -> " + wall_str(w) + " " + w["abbr"] + " (UTC" + show_offset(w["offset_min"]) + ")"
     end
     say ""
 
     # ───────────────────────────────────────────────────────────
-    # 7. Workflow Processing & Batching
+    # 2. Daylight saving in action
     # ───────────────────────────────────────────────────────────
-    say "--- 7. Workflow Processing & Batching ---"
-    let single_res = pkg::process("Analytics", 3, pkg::TzPriority.High)
-    say "Single Process Result: " + pkg::format_result(single_res)
-
-    let items = ["Alpha", "Beta", "Gamma"]
-    let batch_res = pkg::process_batch(items)
-    say "Batch count: " + str(len(batch_res))
-    for b in batch_res
-        say "  - " + b
-    end
+    say "--- 2. DST Flip (New York 2024) ---"
+    say "Jan offset: " + str(pkg::tz_offset_min("America/New_York", 1704067200)) + " min (" + pkg::tz_abbrev("America/New_York", 1704067200) + ")"
+    say "Jul offset: " + str(pkg::tz_offset_min("America/New_York", 1721068245)) + " min (" + pkg::tz_abbrev("America/New_York", 1721068245) + ")"
     say ""
 
     # ───────────────────────────────────────────────────────────
-    # 8. Control Flow & Pattern Matching Utilities
+    # 3. Wall time back to epoch
     # ───────────────────────────────────────────────────────────
-    say "--- 8. Utility Functions ---"
-    say "Clamp (-5 in [0, 100]):  " + str(pkg::clamp(-5, 0, 100))
-    say "Clamp (50 in [0, 100]):  " + str(pkg::clamp(50, 0, 100))
-    say "Clamp (150 in [0, 100]): " + str(pkg::clamp(150, 0, 100))
-
-    say "Pluralize (1):           " + pkg::pluralize(1, "item", "items")
-    say "Pluralize (5):           " + pkg::pluralize(5, "item", "items")
-
-    let repeated = pkg::repeat_string("echo", 3)
-    say "Repeat string count:     " + str(len(repeated))
+    say "--- 3. Roundtrip ---"
+    let wall = pkg::epoch_to_zoned(epoch, "Europe/Berlin")
+    say "Berlin wall:  " + wall_str(wall)
+    say "Back to epoch: " + str(pkg::zoned_to_epoch(wall, "Europe/Berlin"))
     say ""
 
     # ───────────────────────────────────────────────────────────
-    # 9. Destructuring: Tuples & Maps
+    # 4. Inventory
     # ───────────────────────────────────────────────────────────
-    say "--- 9. Destructuring ---"
-    let (label, count) = ("example", 42)
-    say "Tuple label: " + label
-    say "Tuple count: " + str(count)
-
-    let info = { "package": "tz", "version": "0.1.0" }
-    let { package: pkg_name, version: pkg_ver } = info
-    say "Map package: " + pkg_name
-    say "Map version: " + pkg_ver
-
+    say "--- 4. Inventory ---"
+    say "Bundled zones: " + str(len(pkg::tz_names()))
+    say "UTC canonical: " + pkg::tz_canonical("UTC")
     say ""
     say "Done!"
+end
+
+function show_offset(off_min: int) -> string
+    let sign = "+"
+    let v = off_min
+    if v < 0
+        sign = "-"
+        v = 0 - v
+    end
+    return sign + str(v / 60)
+end
+
+function pad2(n: int) -> string
+    if n < 10
+        return f"0{n}"
+    end
+    return str(n)
+end
+
+function wall_str(w) -> string
+    return f"{w["year"]}-{pad2(w["month"])}-{pad2(w["day"])} {pad2(w["hour"])}:{pad2(w["minute"])}:{pad2(w["second"])}"
 end
 
 main()

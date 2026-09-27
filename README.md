@@ -117,6 +117,9 @@ main()
 | `tz_dst_range(name, year)` | `pub function` | Map with `has_dst` and UTC `start_utc`/`end_utc` for a zone year. Throws `TzError` for unknown zones. |
 | `next_transition(name, epoch)` | `pub function` | Next DST transition strictly after the epoch, or null for fixed zones. Throws `TzError` for unknown zones. |
 | `format_zoned_custom(d, fmt)` | `pub function` | Zoned map with token pattern (`YYYY MM DD HH mm ss Z A`). |
+| `format_rfc3339_zoned(d)` | `pub function` | Zoned map to `YYYY-MM-DDTHH:MM:SS+HH:MM`. |
+| `zoned_add_hours(epoch, name, h)` | `pub function` | Absolute hour shift, then re-zoned. |
+| `zoned_add_days(epoch, name, n)` | `pub function` | Calendar day shift keeping the wall clock (DST-safe). |
 | `tz_is_valid(name)` | `pub function` | 1 for bundled zones, aliases, and Windows keys, 0 otherwise. |
 | `tz_canonical(name)` | `pub function` | Alias canonicalization (`"UTC"` → `"Etc/UTC"`). |
 | `TzRule` | `pub struct` | Zone rule model (offsets, recurring DST schedule, UTC/local transition flags). |
@@ -127,6 +130,112 @@ main()
 
 > [!TIP]
 > **Scope:** Rules are recurring current-era schedules (US post-2007, EU post-1996). Fixed zones are exact going forward; pre-changeover historical dates are out of scope for v0.1.0. Public symbols are documented with `##` docstrings for `alya doc`.
+
+---
+
+## 🗺️ Zone Coverage (97 bundled)
+
+| Zone | Std (min) | Rule |
+|---|---|---|
+| `Etc/UTC` | 0 | fixed |
+| `Europe/Istanbul` | 180 | fixed |
+| `Europe/Moscow` | 180 | fixed |
+| `Asia/Dubai` | 240 | fixed |
+| `Asia/Karachi` | 300 | fixed |
+| `Asia/Kolkata` | 330 | fixed |
+| `Asia/Dhaka` | 360 | fixed |
+| `Asia/Amman` | 180 | fixed |
+| `Asia/Singapore` | 480 | fixed |
+| `Asia/Shanghai` | 480 | fixed |
+| `Asia/Hong_Kong` | 480 | fixed |
+| `Asia/Taipei` | 480 | fixed |
+| `Asia/Seoul` | 540 | fixed |
+| `Asia/Tokyo` | 540 | fixed |
+| `Australia/Perth` | 480 | fixed |
+| `Australia/Darwin` | 570 | fixed |
+| `Pacific/Honolulu` | -600 | fixed |
+| `America/Phoenix` | -420 | fixed |
+| `America/Mexico_City` | -360 | fixed |
+| `America/Bogota` | -300 | fixed |
+| `America/Lima` | -300 | fixed |
+| `America/Sao_Paulo` | -180 | fixed |
+| `America/Argentina/Buenos_Aires` | -180 | fixed |
+| `Africa/Lagos` | 60 | fixed |
+| `Africa/Johannesburg` | 120 | fixed |
+| `Africa/Nairobi` | 180 | fixed |
+| `America/New_York` | -300 | DST |
+| `America/Chicago` | -360 | DST |
+| `America/Denver` | -420 | DST |
+| `America/Los_Angeles` | -480 | DST |
+| `America/Anchorage` | -540 | DST |
+| `America/Toronto` | -300 | DST |
+| `America/Vancouver` | -480 | DST |
+| `America/Halifax` | -240 | DST |
+| `Europe/London` | 0 | DST |
+| `Europe/Lisbon` | 0 | DST |
+| `Atlantic/Azores` | -60 | DST |
+| `Europe/Berlin` | 60 | DST |
+| `Europe/Paris` | 60 | DST |
+| `Europe/Rome` | 60 | DST |
+| `Europe/Madrid` | 60 | DST |
+| `Europe/Amsterdam` | 60 | DST |
+| `Europe/Zurich` | 60 | DST |
+| `Europe/Vienna` | 60 | DST |
+| `Europe/Prague` | 60 | DST |
+| `Europe/Warsaw` | 60 | DST |
+| `Europe/Athens` | 120 | DST |
+| `Europe/Helsinki` | 120 | DST |
+| `Europe/Chisinau` | 120 | DST |
+| `Australia/Sydney` | 600 | DST |
+| `Australia/Melbourne` | 600 | DST |
+| `Pacific/Auckland` | 720 | DST |
+| `Africa/Cairo` | 120 | DST |
+| `America/Havana` | -300 | DST |
+| `Atlantic/Bermuda` | -240 | DST |
+| `America/St_Johns` | -210 | DST |
+| `Australia/Hobart` | 600 | DST |
+| `Australia/Adelaide` | 570 | DST |
+| `Australia/Lord_Howe` | 630 | DST |
+| `Pacific/Chatham` | 765 | DST |
+| `Pacific/Fiji` | 720 | DST |
+| `America/Santiago` | -240 | DST |
+| `Pacific/Easter` | -360 | DST |
+| `America/Asuncion` | -240 | DST |
+| `Asia/Beirut` | 120 | DST |
+| `Europe/Kyiv` | 120 | DST |
+| `Asia/Manila` | 480 | fixed |
+| `Asia/Jakarta` | 420 | fixed |
+| `Asia/Bangkok` | 420 | fixed |
+| `Pacific/Guam` | 600 | fixed |
+| `Pacific/Port_Moresby` | 600 | fixed |
+| `Australia/Brisbane` | 600 | fixed |
+| `Asia/Kathmandu` | 345 | fixed |
+| `Asia/Baghdad` | 180 | fixed |
+| `Asia/Tbilisi` | 240 | fixed |
+| `Asia/Yerevan` | 240 | fixed |
+| `America/Noronha` | -120 | fixed |
+| `Pacific/Marquesas` | -570 | fixed |
+| `Australia/Eucla` | 525 | fixed |
+| `America/Regina` | -360 | fixed |
+| `America/Cancun` | -300 | fixed |
+| `America/Cuiaba` | -240 | fixed |
+| `America/La_Paz` | -240 | fixed |
+| `America/Cayenne` | -180 | fixed |
+| `America/Araguaina` | -180 | fixed |
+| `Atlantic/Reykjavik` | 0 | fixed |
+| `Atlantic/Cape_Verde` | -60 | fixed |
+| `Pacific/Apia` | 780 | fixed |
+| `Pacific/Tongatapu` | 780 | fixed |
+| `Pacific/Kiritimati` | 840 | fixed |
+| `Pacific/Bougainville` | 660 | fixed |
+| `America/Tijuana` | -480 | DST |
+| `America/Grand_Turk` | -300 | DST |
+| `America/Port-au-Prince` | -300 | DST |
+| `America/Miquelon` | -180 | DST |
+| `America/Nuuk` | -180 | DST |
+| `Pacific/Norfolk` | 660 | DST |
+
+Not covered (irregular rules): `Asia/Jerusalem`, `Asia/Tehran`, `Africa/Casablanca`, `Asia/Gaza`, `Asia/Damascus`. `tz_rule` returns null for these; every conversion throws `TzError`.
 
 ---
 

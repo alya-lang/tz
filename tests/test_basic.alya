@@ -288,6 +288,45 @@ function main()
     runner_assert_eq(r, pkg::tz_offset_min("Pacific/Norfolk", 1704067200), 720, "Norfolk DST in January")
     runner_assert_eq(r, pkg::tz_offset_min("America/Nuuk", 1721068245), 0 - 120, "Nuuk WGST in July")
 
+    # ═══════════════════════════════════════════════════════════
+    # 13. All-zone seasonal fuzz roundtrip (validates every rule)
+    # ═══════════════════════════════════════════════════════════
+    let probe_epochs = [1704067200, 1711929600, 1721068245, 1727740800]
+    let fuzz_bad = 0
+    for z in pkg::tz_names()
+        for e in probe_epochs
+            let w = pkg::epoch_to_zoned(e, z)
+            if pkg::zoned_to_epoch(w, z) != e
+                fuzz_bad += 1
+            end
+        end
+    end
+    runner_assert_eq(r, fuzz_bad, 0, "all-zone seasonal roundtrip")
+
+    # ═══════════════════════════════════════════════════════════
+    # 14. Fold/gap behavior locks (NY 2024)
+    # ═══════════════════════════════════════════════════════════
+    runner_assert_eq(r, pkg::parse_zoned("2024-03-10 02:30:00", "America/New_York"), pkg::parse_zoned("2024-03-10 03:30:00", "America/New_York"), "spring gap resolves forward")
+    runner_assert_eq(r, pkg::parse_zoned("2024-11-03 01:30:00", "America/New_York"), 1730615400, "fall fold resolves to EST occurrence")
+    let fold_wall = pkg::epoch_to_zoned(1730615400, "America/New_York")
+    runner_assert_str_eq(r, fold_wall["abbr"], "EST", "fold occurrence abbr is EST")
+
+    # ═══════════════════════════════════════════════════════════
+    # 15. RFC3339 zoned format + wall arithmetic
+    # ═══════════════════════════════════════════════════════════
+    runner_assert_str_eq(r, pkg::format_rfc3339_zoned(pkg::epoch_to_zoned(1704067200, "Asia/Shanghai")), "2024-01-01T08:00:00+08:00", "rfc3339 zoned Shanghai")
+    runner_assert_str_eq(r, pkg::format_rfc3339_zoned(pkg::epoch_to_zoned(1721068245, "America/New_York")), "2024-07-15T14:30:45-04:00", "rfc3339 zoned NY summer")
+
+    let ny_eve = 1709960400
+    let plus_day = pkg::zoned_add_days(ny_eve, "America/New_York", 1)
+    runner_assert_eq(r, plus_day["day"], 10, "add_days crosses into Mar 10")
+    runner_assert_eq(r, plus_day["hour"], 0, "add_days keeps midnight across spring forward")
+    runner_assert_str_eq(r, plus_day["abbr"], "EST", "Mar 10 midnight is still EST")
+    let plus_30h = pkg::zoned_add_hours(ny_eve, "America/New_York", 30)
+    runner_assert_eq(r, plus_30h["hour"], 7, "add_hours absolute lands 07:00 EDT")
+    runner_assert_str_eq(r, plus_30h["abbr"], "EDT", "add_hours crosses into DST")
+    runner_assert_eq(r, pkg::zoned_add_days(ny_eve, "America/New_York", 0 - 1)["day"], 8, "add_days negative works")
+
     let failed = runner_summary(r)
     if failed > 0
         exit(1)

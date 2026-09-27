@@ -611,3 +611,60 @@ pub function engine_format_zoned_custom(d, fmt: string) -> string
     end
     return res
 end
+
+## Formats a zoned calendar map as RFC 3339 with numeric offset.
+##
+## ### Parameters
+## - `d`: Zoned calendar map from `epoch_to_zoned` (must carry `offset_min`).
+##
+## ### Returns
+## Wall time such as `"2024-01-01T08:00:00+08:00"`.
+pub function engine_format_rfc3339_zoned(d) -> string
+    let off: int = d["offset_min"]
+    let sign: string = "+"
+    let v: int = off
+    if v < 0
+        sign = "-"
+        v = 0 - v
+    end
+    let tail: string = f"{sign}{_tz_pad2(v / 60)}:{_tz_pad2(v % 60)}"
+    return f"{d["year"]}-{_tz_pad2(d["month"])}-{_tz_pad2(d["day"])}T{_tz_pad2(d["hour"])}:{_tz_pad2(d["minute"])}:{_tz_pad2(d["second"])}{tail}"
+end
+
+## Adds whole hours on the absolute timeline, then re-zones.
+##
+## ### Parameters
+## - `epoch`: UTC epoch seconds.
+## - `name`: IANA zone name, alias, or Windows key.
+## - `h`: Hours to add (may be negative).
+##
+## ### Returns
+## Zoned calendar map `h` absolute hours later (see `epoch_to_zoned`).
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function engine_zoned_add_hours(epoch: int, name: string, h: int)
+    return engine_epoch_to_zoned(epoch + h * 3600, name)
+end
+
+## Adds calendar days keeping the wall clock, then re-zones.
+##
+## Unlike `zoned_add_hours`, the wall time is preserved: adding 1 day to
+## midnight always yields midnight, even across a DST transition.
+##
+## ### Parameters
+## - `epoch`: UTC epoch seconds.
+## - `name`: IANA zone name, alias, or Windows key.
+## - `n`: Days to add (may be negative).
+##
+## ### Returns
+## Zoned calendar map `n` calendar days later with the same wall time.
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function engine_zoned_add_days(epoch: int, name: string, n: int)
+    let wall = engine_epoch_to_zoned(epoch, name)
+    let shifted = epoch_to_date(date_ymd_to_epoch(wall["year"], wall["month"], wall["day"]) + n * 86400)
+    let target: int = engine_zoned_to_epoch({ "year": shifted["year"], "month": shifted["month"], "day": shifted["day"], "hour": wall["hour"], "minute": wall["minute"], "second": wall["second"] }, name)
+    return engine_epoch_to_zoned(target, name)
+end

@@ -96,7 +96,25 @@ pub function tzdata_rules() -> array
         fixed_rule("Asia/Yerevan", "+04", 240),
         fixed_rule("America/Noronha", "-02", 0 - 120),
         fixed_rule("Pacific/Marquesas", "-0930", 0 - 570),
-        fixed_rule("Australia/Eucla", "+0845", 525)
+        fixed_rule("Australia/Eucla", "+0845", 525),
+        fixed_rule("America/Regina", "-06", 0 - 360),
+        fixed_rule("America/Cancun", "-05", 0 - 300),
+        fixed_rule("America/Cuiaba", "-04", 0 - 240),
+        fixed_rule("America/La_Paz", "-04", 0 - 240),
+        fixed_rule("America/Cayenne", "-03", 0 - 180),
+        fixed_rule("America/Araguaina", "-03", 0 - 180),
+        fixed_rule("Atlantic/Reykjavik", "GMT", 0),
+        fixed_rule("Atlantic/Cape_Verde", "-01", 0 - 60),
+        fixed_rule("Pacific/Apia", "+13", 780),
+        fixed_rule("Pacific/Tongatapu", "+13", 780),
+        fixed_rule("Pacific/Kiritimati", "+14", 840),
+        fixed_rule("Pacific/Bougainville", "+11", 660),
+        dst_rule("America/Tijuana", "PST", "PDT", 0 - 480, 0 - 420, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Grand_Turk", "EST", "EDT", 0 - 300, 0 - 240, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Port-au-Prince", "EST", "EDT", 0 - 300, 0 - 240, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Miquelon", "-03", "-02", 0 - 180, 0 - 120, 3, 2, 0, 2, 0, 11, 1, 0, 2, 0),
+        dst_rule("America/Nuuk", "-03", "-02", 0 - 180, 0 - 120, 3, 5, 0, 1, 1, 10, 5, 0, 1, 1),
+        dst_rule("Pacific/Norfolk", "+11", "+12", 660, 720, 10, 1, 0, 2, 0, 4, 1, 0, 3, 0)
     ]
 end
 

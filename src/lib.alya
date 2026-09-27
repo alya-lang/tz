@@ -113,6 +113,120 @@ pub function tz_canonical(name: string) -> string
     return tzdata_canonical(name)
 end
 
+## Returns the bundled data revision identifier.
+##
+## ### Parameters
+## None.
+##
+## ### Returns
+## Opaque revision string for the bundled rule set.
+pub function tzdata_version() -> string
+    return engine_tzdata_version()
+end
+
+## Returns bundled zone names under a region prefix.
+##
+## ### Parameters
+## - `prefix`: Region prefix such as `"Europe/"` or `"America/"`.
+##
+## ### Returns
+## Matching IANA zone names (empty array when none match).
+pub function tz_by_region(prefix: string) -> array
+    return engine_tz_by_region(prefix)
+end
+
+## Returns bundled zone names using an offset.
+##
+## A zone matches when its standard offset equals `offset_min`, or when it
+## has daylight saving and its daylight offset equals `offset_min`.
+##
+## ### Parameters
+## - `offset_min`: Offset minutes east of UTC.
+##
+## ### Returns
+## Matching IANA zone names (empty array when none match).
+pub function tz_by_offset(offset_min: int) -> array
+    return engine_tz_by_offset(offset_min)
+end
+
+## Returns the DST transition instants for a zone year.
+##
+## ### Parameters
+## - `name`: IANA zone name, alias, or Windows key.
+## - `year`: Gregorian year.
+##
+## ### Returns
+## Map with `has_dst` (1/0) and UTC epoch `start_utc`/`end_utc`
+## (0 for fixed zones).
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function tz_dst_range(name: string, year: int)
+    return engine_tz_dst_range(name, year)
+end
+
+## Returns the next DST transition instant strictly after the epoch.
+##
+## ### Parameters
+## - `name`: IANA zone name, alias, or Windows key.
+## - `epoch`: UTC epoch seconds.
+##
+## ### Returns
+## Next transition UTC epoch, or null for fixed zones.
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function next_transition(name: string, epoch: int)
+    return engine_next_transition(name, epoch)
+end
+
+## Parses a wall-time string in the zone into a UTC epoch.
+##
+## Accepts `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SS`, and the space-separated
+## form, with an optional ignored fraction (`.mmm`). No zone suffix is
+## read: the wall reading belongs to `name`. The UTC-startup complement
+## of `parse_iso8601`.
+##
+## ### Parameters
+## - `s`: Wall-time string.
+## - `name`: IANA zone name, alias, or Windows key.
+##
+## ### Returns
+## UTC epoch seconds.
+##
+## ### Throws
+## `TzError` when the string is malformed, the date is invalid, or the
+## zone is not bundled.
+##
+## ### Examples
+## ```alya
+## parse_zoned("2024-01-01 08:00:00", "Asia/Shanghai") # 1704067200
+## ```
+pub function parse_zoned(s: string, name: string) -> int
+    return engine_parse_zoned(s, name)
+end
+
+## Formats a zoned calendar map with a custom token pattern.
+##
+## Tokens: `YYYY` year, `MM` month, `DD` day, `HH` hour (24h), `mm`
+## minute, `ss` second, `Z` numeric offset (`+HH:MM`), `A` abbreviation.
+## Any other character passes through literally.
+##
+## ### Parameters
+## - `d`: Zoned calendar map from `epoch_to_zoned` (must carry `offset_min`).
+## - `fmt`: Token pattern.
+##
+## ### Returns
+## Formatted wall-time string.
+##
+## ### Examples
+## ```alya
+## format_zoned_custom(w, "DD.MM.YYYY HH:mm Z") # "01.01.2024 08:00 +08:00"
+## ```
+pub function format_zoned_custom(d, fmt: string) -> string
+    return engine_format_zoned_custom(d, fmt)
+end
+
 ## Resolves a Windows zone key to IANA (mirrored table, see `sysinfo`).
 ##
 ## ### Parameters

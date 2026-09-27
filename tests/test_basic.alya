@@ -22,7 +22,7 @@ function main()
     runner_assert_str_eq(r, pkg::tz_canonical("Europe/Berlin"), "Europe/Berlin", "canonical names pass through")
 
     let names = pkg::tz_names()
-    runner_assert_eq(r, len(names), 79, "79 bundled zones")
+    runner_assert_eq(r, len(names), 97, "97 bundled zones")
     runner_assert_true(r, names_contains(names, "Pacific/Auckland"), "Auckland listed")
 
     let rule = pkg::tz_rule("Asia/Tokyo")
@@ -192,6 +192,102 @@ function main()
     runner_assert_eq(r, pkg::tz_offset_min("Eastern Standard Time", 1704067200), 0 - 300, "Windows key offset works")
     runner_assert_eq(r, pkg::epoch_to_zoned(1704067200, "Tokyo Standard Time")["hour"], 9, "Windows key conversion works")
 
+    # ═══════════════════════════════════════════════════════════
+    # 9. parse_zoned: wall strings in zone
+    # ═══════════════════════════════════════════════════════════
+    runner_assert_eq(r, pkg::parse_zoned("2024-01-01 08:00:00", "Asia/Shanghai"), 1704067200, "parse_zoned Shanghai wall")
+    runner_assert_eq(r, pkg::parse_zoned("2024-01-01T08:00:00", "Asia/Shanghai"), 1704067200, "parse_zoned T separator")
+    runner_assert_eq(r, pkg::parse_zoned("2024-01-01", "Asia/Shanghai"), 1704038400, "parse_zoned date-only is midnight")
+    runner_assert_eq(r, pkg::parse_zoned("2024-07-15 14:30:45", "America/New_York"), 1721068245, "parse_zoned NY summer wall")
+    runner_assert_eq(r, pkg::parse_zoned("2024-01-01 08:00:00.123", "Asia/Shanghai"), 1704067200, "parse_zoned ignores fraction")
+
+    let pz_bad = 0
+    try
+        pkg::parse_zoned("not-a-date", "Asia/Shanghai")
+        pz_bad += 1
+    catch err
+        pz_bad += 0
+    end
+    try
+        pkg::parse_zoned("2023-02-29 00:00:00", "Etc/UTC")
+        pz_bad += 1
+    catch err
+        pz_bad += 0
+    end
+    try
+        pkg::parse_zoned("2024-01-01 25:00:00", "Etc/UTC")
+        pz_bad += 1
+    catch err
+        pz_bad += 0
+    end
+    try
+        pkg::parse_zoned("2024-01-01 00:00:00", "Moon/Sea")
+        pz_bad += 1
+    catch err
+        pz_bad += 0
+    end
+    runner_assert_eq(r, pz_bad, 0, "all bad parse_zoned throw")
+
+    # ═══════════════════════════════════════════════════════════
+    # 10. Transitions: dst_range + next_transition
+    # ═══════════════════════════════════════════════════════════
+    let nyr = pkg::tz_dst_range("America/New_York", 2024)
+    runner_assert_eq(r, nyr["has_dst"], 1, "NY 2024 has DST")
+    runner_assert_eq(r, nyr["start_utc"], 1710054000, "NY 2024 spring forward")
+    runner_assert_eq(r, nyr["end_utc"], 1730613600, "NY 2024 fall back")
+
+    let tokyo_range = pkg::tz_dst_range("Asia/Tokyo", 2024)
+    runner_assert_eq(r, tokyo_range["has_dst"], 0, "Tokyo has no DST")
+    runner_assert_eq(r, tokyo_range["start_utc"], 0, "fixed range start is 0")
+
+    runner_assert_eq(r, pkg::next_transition("America/New_York", 1704067200), 1710054000, "next after Jan is spring")
+    runner_assert_eq(r, pkg::next_transition("America/New_York", 1710054000), 1730613600, "at spring, next is fall")
+    runner_assert_eq(r, pkg::next_transition("America/New_York", 1730613600), 1741503600, "after fall, next is 2025 spring")
+
+    let syd_next = pkg::next_transition("Australia/Sydney", 1704067200)
+    runner_assert_eq(r, pkg::tz_offset_min("Australia/Sydney", syd_next - 1), 660, "Sydney DST before transition")
+    runner_assert_eq(r, pkg::tz_offset_min("Australia/Sydney", syd_next), 600, "Sydney STD after transition")
+
+    let fixed_next = pkg::next_transition("Asia/Tokyo", 1704067200)
+    runner_assert_true(r, fixed_next is null, "fixed zone next is null")
+
+    # ═══════════════════════════════════════════════════════════
+    # 11. Discovery + version + custom format
+    # ═══════════════════════════════════════════════════════════
+    runner_assert_true(r, len(pkg::tzdata_version()) > 0, "tzdata version non-empty")
+
+    let europe = pkg::tz_by_region("Europe/")
+    runner_assert_true(r, len(europe) > 10, "many European zones")
+    let all_eu = 1
+    for z in europe
+        if substring(z, 0, 7) != "Europe/"
+            all_eu = 0
+        end
+    end
+    runner_assert_eq(r, all_eu, 1, "region filter is exact")
+    runner_assert_eq(r, len(pkg::tz_by_region("Moon/")), 0, "empty region matches nothing")
+
+    let zero_zones = pkg::tz_by_offset(0)
+    runner_assert_true(r, zone_contains(zero_zones, "Etc/UTC"), "offset 0 contains UTC")
+    runner_assert_true(r, zone_contains(zero_zones, "Atlantic/Reykjavik"), "offset 0 contains Reykjavik")
+    runner_assert_true(r, zone_contains(zero_zones, "Europe/London"), "offset 0 contains London via DST")
+
+    let sh_wall = pkg::epoch_to_zoned(1704067200, "Asia/Shanghai")
+    runner_assert_str_eq(r, pkg::format_zoned_custom(sh_wall, "DD.MM.YYYY HH:mm Z"), "01.01.2024 08:00 +08:00", "custom format tokens")
+    runner_assert_str_eq(r, pkg::format_zoned_custom(sh_wall, "A YYYY/MM/DD"), "CST 2024/01/01", "custom format abbr")
+    runner_assert_str_eq(r, pkg::format_zoned_custom(sh_wall, "ss-mm-HH"), "00-00-08", "custom format hour token")
+
+    # ═══════════════════════════════════════════════════════════
+    # 12. Second-wave zones spot checks
+    # ═══════════════════════════════════════════════════════════
+    runner_assert_eq(r, pkg::tz_offset_min("Atlantic/Reykjavik", 1704067200), 0, "Reykjavik fixed 0")
+    runner_assert_eq(r, pkg::tz_offset_min("Pacific/Apia", 1704067200), 780, "Apia +780")
+    runner_assert_eq(r, pkg::tz_offset_min("Pacific/Kiritimati", 1704067200), 840, "Kiritimati +840")
+    runner_assert_eq(r, pkg::tz_offset_min("America/Regina", 1704067200), 0 - 360, "Regina fixed -360")
+    runner_assert_eq(r, pkg::tz_offset_min("America/Tijuana", 1721068245), 0 - 420, "Tijuana PDT in July")
+    runner_assert_eq(r, pkg::tz_offset_min("Pacific/Norfolk", 1704067200), 720, "Norfolk DST in January")
+    runner_assert_eq(r, pkg::tz_offset_min("America/Nuuk", 1721068245), 0 - 120, "Nuuk WGST in July")
+
     let failed = runner_summary(r)
     if failed > 0
         exit(1)
@@ -205,6 +301,10 @@ function names_contains(names, want: string) -> int
         end
     end
     return 0
+end
+
+function zone_contains(names, want: string) -> int
+    return names_contains(names, want)
 end
 
 main()

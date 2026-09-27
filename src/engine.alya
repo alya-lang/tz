@@ -331,3 +331,283 @@ pub function engine_zoned_to_epoch(d, name: string) -> int
     end
     return epoch
 end
+
+# --- Discovery ---
+
+## Returns the bundled data revision identifier.
+##
+## ### Parameters
+## None.
+##
+## ### Returns
+## Opaque revision string for the bundled rule set.
+pub function engine_tzdata_version() -> string
+    return "2026a-era recurring subset"
+end
+
+## Returns bundled zone names under a region prefix.
+##
+## ### Parameters
+## - `prefix`: Region prefix such as `"Europe/"` or `"America/"`.
+##
+## ### Returns
+## Matching IANA zone names (empty array when none match).
+pub function engine_tz_by_region(prefix: string) -> array
+    let res = []
+    for n in engine_tz_names()
+        if substring(n, 0, len(prefix)) == prefix
+            res.push(n)
+        end
+    end
+    return res
+end
+
+## Returns bundled zone names using an offset.
+##
+## A zone matches when its standard offset equals `offset_min`, or when it
+## has daylight saving and its daylight offset equals `offset_min`.
+##
+## ### Parameters
+## - `offset_min`: Offset minutes east of UTC.
+##
+## ### Returns
+## Matching IANA zone names (empty array when none match).
+pub function engine_tz_by_offset(offset_min: int) -> array
+    let res = []
+    for r in tzdata_rules()
+        if r.std_offset_min == offset_min
+            res.push(r.name)
+        elif r.dst_start_month != 0 and r.dst_offset_min == offset_min
+            res.push(r.name)
+        end
+    end
+    return res
+end
+
+# --- Transitions ---
+
+## Returns the DST transition instants for a zone year.
+##
+## ### Parameters
+## - `name`: IANA zone name, alias, or Windows key.
+## - `year`: Gregorian year.
+##
+## ### Returns
+## Map with `has_dst` (1/0) and UTC epoch `start_utc`/`end_utc`
+## (0 for fixed zones).
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function engine_tz_dst_range(name: string, year: int)
+    let rule = _tz_require(name)
+    if rule.has_dst() == 0
+        return { "has_dst": 0, "start_utc": 0, "end_utc": 0 }
+    end
+    return {
+        "has_dst": 1,
+        "start_utc": _tz_transition_utc(rule, year, 1),
+        "end_utc": _tz_transition_utc(rule, year, 0)
+    }
+end
+
+## Returns the next DST transition instant strictly after the epoch.
+##
+## ### Parameters
+## - `name`: IANA zone name, alias, or Windows key.
+## - `epoch`: UTC epoch seconds.
+##
+## ### Returns
+## Next transition UTC epoch, or null for fixed zones.
+##
+## ### Throws
+## `TzError` when the zone is not bundled.
+pub function engine_next_transition(name: string, epoch: int)
+    let rule = _tz_require(name)
+    if rule.has_dst() == 0
+        return null
+    end
+    let year: int = epoch_to_date(epoch)["year"]
+    let start_utc: int = _tz_transition_utc(rule, year, 1)
+    let end_utc: int = _tz_transition_utc(rule, year, 0)
+    if rule.dst_start_month <= rule.dst_end_month
+        if epoch < start_utc
+            return start_utc
+        end
+        if epoch < end_utc
+            return end_utc
+        end
+        return _tz_transition_utc(rule, year + 1, 1)
+    end
+    if epoch < end_utc
+        return end_utc
+    end
+    if epoch < start_utc
+        return start_utc
+    end
+    return _tz_transition_utc(rule, year + 1, 0)
+end
+
+# --- Wall-time string parsing ---
+
+function _tz_parse_digits(s: string) -> int
+    if len(s) == 0
+        return 0
+    end
+    let i: int = 0
+    while i < len(s)
+        let c: int = ord(char_at(s, i))
+        if c < 48 or c > 57
+            return 0
+        end
+        i += 1
+    end
+    return 1
+end
+
+function _tz_parse_num(s: string, pos: int, count: int) -> int
+    if pos < 0 or count <= 0 or pos + count > len(s)
+        return -1
+    end
+    let part: string = substring(s, pos, count)
+    if _tz_parse_digits(part) == 0
+        return -1
+    end
+    return to_int(part)
+end
+
+## Parses a wall-time string in the zone into a UTC epoch.
+##
+## Accepts `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SS`, and the space-separated
+## form, with an optional ignored fraction (`.mmm`). No zone suffix is
+## read: the wall reading belongs to `name` (see `zoned_to_epoch` for
+## gap/fold behavior). The UTC-startup complement of `parse_iso8601`.
+##
+## ### Parameters
+## - `s`: Wall-time string.
+## - `name`: IANA zone name, alias, or Windows key.
+##
+## ### Returns
+## UTC epoch seconds.
+##
+## ### Throws
+## `TzError` when the string is malformed, the date is invalid, or the
+## zone is not bundled.
+##
+## ### Examples
+## ```alya
+## parse_zoned("2024-01-01 08:00:00", "Asia/Shanghai") # 1704067200
+## ```
+pub function engine_parse_zoned(s: string, name: string) -> int
+    let n: int = len(s)
+    if n < 10
+        throw TzError { message: f"Invalid wall time (too short): {s}" }
+    end
+    let year: int = _tz_parse_num(s, 0, 4)
+    let month: int = _tz_parse_num(s, 5, 2)
+    let day: int = _tz_parse_num(s, 8, 2)
+    if year < 0 or char_at(s, 4) != "-" or char_at(s, 7) != "-"
+        throw TzError { message: f"Invalid wall date (expected YYYY-MM-DD): {s}" }
+    end
+    if month < 1 or month > 12 or day < 1 or day > days_in_month(month, year)
+        throw TzError { message: f"Invalid calendar date: {s}" }
+    end
+    if n == 10
+        return engine_zoned_to_epoch({ "year": year, "month": month, "day": day, "hour": 0, "minute": 0, "second": 0 }, name)
+    end
+    let sep: string = char_at(s, 10)
+    if sep != "T" and sep != "t" and sep != " "
+        throw TzError { message: f"Invalid separator (expected T): {s}" }
+    end
+    if n < 19
+        throw TzError { message: f"Invalid wall time (expected HH:MM:SS): {s}" }
+    end
+    let hour: int = _tz_parse_num(s, 11, 2)
+    let minute: int = _tz_parse_num(s, 14, 2)
+    let second: int = _tz_parse_num(s, 17, 2)
+    if hour < 0 or char_at(s, 13) != ":" or char_at(s, 16) != ":"
+        throw TzError { message: f"Invalid wall time (expected HH:MM:SS): {s}" }
+    end
+    if minute < 0 or second < 0 or hour > 23 or minute > 59 or second > 59
+        throw TzError { message: f"Wall time out of range: {s}" }
+    end
+    let pos: int = 19
+    if pos < n and char_at(s, pos) == "."
+        pos += 1
+        let frac_start: int = pos
+        while pos < n and _tz_parse_digits(char_at(s, pos)) == 1
+            pos += 1
+        end
+        if pos == frac_start
+            throw TzError { message: f"Invalid fraction (digits expected after .): {s}" }
+        end
+    end
+    if pos != n
+        throw TzError { message: f"Trailing characters: {s}" }
+    end
+    return engine_zoned_to_epoch({ "year": year, "month": month, "day": day, "hour": hour, "minute": minute, "second": second }, name)
+end
+
+## Formats a zoned calendar map with a custom token pattern.
+##
+## Tokens: `YYYY` year, `MM` month, `DD` day, `HH` hour (24h), `mm`
+## minute, `ss` second, `Z` numeric offset (`+HH:MM`), `A` abbreviation.
+## Any other character passes through literally.
+##
+## ### Parameters
+## - `d`: Zoned calendar map from `epoch_to_zoned` (must carry `offset_min`).
+## - `fmt`: Token pattern.
+##
+## ### Returns
+## Formatted wall-time string.
+##
+## ### Examples
+## ```alya
+## format_zoned_custom(w, "DD.MM.YYYY HH:mm Z") # "01.01.2024 08:00 +08:00"
+## ```
+pub function engine_format_zoned_custom(d, fmt: string) -> string
+    let res: string = ""
+    let i: int = 0
+    let n: int = len(fmt)
+    while i < n
+        if i + 4 <= n and substring(fmt, i, 4) == "YYYY"
+            res += str(d["year"])
+            i += 4
+        elif i + 2 <= n and substring(fmt, i, 2) == "MM"
+            res += _tz_pad2(d["month"])
+            i += 2
+        elif i + 2 <= n and substring(fmt, i, 2) == "DD"
+            res += _tz_pad2(d["day"])
+            i += 2
+        elif i + 2 <= n and substring(fmt, i, 2) == "HH"
+            res += _tz_pad2(d["hour"])
+            i += 2
+        elif i + 2 <= n and substring(fmt, i, 2) == "mm"
+            res += _tz_pad2(d["minute"])
+            i += 2
+        elif i + 2 <= n and substring(fmt, i, 2) == "ss"
+            res += _tz_pad2(d["second"])
+            i += 2
+        elif char_at(fmt, i) == "Z"
+            let off: int = d["offset_min"]
+            let sign: string = "+"
+            let v: int = off
+            if v < 0
+                sign = "-"
+                v = 0 - v
+            end
+            res += f"{sign}{_tz_pad2(v / 60)}:{_tz_pad2(v % 60)}"
+            i += 1
+        elif char_at(fmt, i) == "A"
+            if d["abbr"] is null
+                res += ""
+            else
+                res += d["abbr"]
+            end
+            i += 1
+        else
+            res += char_at(fmt, i)
+            i += 1
+        end
+    end
+    return res
+end

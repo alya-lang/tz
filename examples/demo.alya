@@ -36,6 +36,8 @@ function main()
     let wall = pkg::epoch_to_zoned(epoch, "Europe/Berlin")
     say "Berlin wall:  " + pkg::format_zoned(wall)
     say "Back to epoch: " + str(pkg::zoned_to_epoch(wall, "Europe/Berlin"))
+    say "Parsed back:   " + str(pkg::parse_zoned("2024-01-01 01:00:00", "Europe/Berlin"))
+    say "Next NY flip:  " + str(pkg::next_transition("America/New_York", epoch))
     say "Now in Tokyo: " + pkg::format_zoned(pkg::zoned_now("Asia/Tokyo"))
     say ""
 

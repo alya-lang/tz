@@ -1,0 +1,32 @@
+[package]
+name = "tz"
+version = "0.1.0"
+alya-version = "0.0.19"
+entry = "src/lib.alya"
+description = "IANA timezone database and zone-aware datetime conversion for Alya"
+authors = ["Alya Language Contributors <https://github.com/alya-lang>"]
+license = "MIT"
+homepage = "https://github.com/alya-lang/alya"
+repository = "https://github.com/alya-lang/tz"
+keywords = ["alya", "alya-lang", "package", "tz", "timezone", "time", "iana", "dst"]
+
+[dependencies]
+
+# [build]
+# c-sources = ["c/source.c"]
+# c-flags = ["-O2"]
+# c-include-dirs = ["c"]
+# links = "tz"
+
+# [lint]
+# disabled_rules = []
+# exclude = []
+
+# [fmt]
+# exclude = []
+
+# [test]
+# exclude = []
+
+# [bench]
+# exclude = []

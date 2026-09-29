@@ -176,21 +176,8 @@ function main()
     let now_wall = pkg::zoned_now("Etc/UTC")
     runner_assert_true(r, now_wall["year"] >= 2026, "zoned_now year sane")
     runner_assert_str_eq(r, now_wall["iana"], "Etc/UTC", "zoned_now iana")
-
-    runner_assert_str_eq(r, pkg::tz_windows_iana("Turkey Standard Time"), "Europe/Istanbul", "windows table maps key")
-    runner_assert_str_eq(r, pkg::tz_windows_iana("No Such Zone"), "", "windows table unknown is empty")
-
-    let win_rule = pkg::tz_rule("Turkey Standard Time")
-    let win_ok = 0
-    if win_rule is null
-        win_ok = 0
-    else
-        win_ok = 1
-    end
-    runner_assert_eq(r, win_ok, 1, "Windows key resolves to a rule")
-    runner_assert_str_eq(r, win_rule.name, "Europe/Istanbul", "Windows key rule is Istanbul")
-    runner_assert_eq(r, pkg::tz_offset_min("Eastern Standard Time", 1704067200), 0 - 300, "Windows key offset works")
-    runner_assert_eq(r, pkg::epoch_to_zoned(1704067200, "Tokyo Standard Time")["hour"], 9, "Windows key conversion works")
+    @cfg(feature = "windows")
+    check_windows_keys(r)
 
     # ═══════════════════════════════════════════════════════════
     # 9. parse_zoned: wall strings in zone
@@ -346,4 +333,21 @@ function zone_contains(names, want: string) -> int
     return names_contains(names, want)
 end
 
+@cfg(feature = "windows")
+function check_windows_keys(r)
+    runner_assert_str_eq(r, pkg::tz_windows_iana("Turkey Standard Time"), "Europe/Istanbul", "windows table maps key")
+    runner_assert_str_eq(r, pkg::tz_windows_iana("No Such Zone"), "", "windows table unknown is empty")
+
+    let win_rule = pkg::tz_rule("Turkey Standard Time")
+    let win_ok = 0
+    if win_rule is null
+        win_ok = 0
+    else
+        win_ok = 1
+    end
+    runner_assert_eq(r, win_ok, 1, "Windows key resolves to a rule")
+    runner_assert_str_eq(r, win_rule.name, "Europe/Istanbul", "Windows key rule is Istanbul")
+    runner_assert_eq(r, pkg::tz_offset_min("Eastern Standard Time", 1704067200), 0 - 300, "Windows key offset works")
+    runner_assert_eq(r, pkg::epoch_to_zoned(1704067200, "Tokyo Standard Time")["hour"], 9, "Windows key conversion works")
+end
 main()

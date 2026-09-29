@@ -7,6 +7,7 @@
 import "std/time"
 import "./types.alya"
 import "./tzdata/zones.alya"
+@cfg(feature = "windows")
 import "./tzdata/windows.alya"
 
 # --- Lookup ---
@@ -31,7 +32,9 @@ pub function engine_tz_rule(name: string)
             return r
         end
     end
+    @cfg(feature = "windows")
     let wname = tzdata_windows_iana(name)
+    @cfg(feature = "windows")
     if wname != "" and wname != cname
         for r in tzdata_rules()
             if r.name == wname

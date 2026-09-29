@@ -280,6 +280,9 @@ end
 ##
 ## ### Returns
 ## IANA zone name, or "" when unmappable.
+##
+## Requires the `windows` feature (default-on).
+@cfg(feature = "windows")
 pub function tz_windows_iana(name: string) -> string
     return tzdata_windows_iana(name)
 end

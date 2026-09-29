@@ -12,6 +12,10 @@ keywords = ["alya", "alya-lang", "package", "tz", "timezone", "time", "iana", "d
 
 [dependencies]
 
+[features]
+default = ["windows"]
+windows = []
+
 # [build]
 # c-sources = ["c/source.c"]
 # c-flags = ["-O2"]

@@ -18,6 +18,7 @@ function main()
         let w = pkg::epoch_to_zoned(epoch, z)
         say z + " -> " + pkg::format_zoned(w) + " " + w["abbr"]
     end
+    @cfg(feature = "windows")
     say "Windows key:  " + pkg::format_zoned(pkg::epoch_to_zoned(epoch, "Turkey Standard Time"))
     say ""
 

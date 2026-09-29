@@ -70,6 +70,22 @@ alya add tz --git https://github.com/alya-lang/tz --branch main
 alya install
 ```
 
+### Package Features
+
+| Feature | Default | Description |
+|:---|:---:|:---|
+| `windows` | ✅ | Windows zone-key mapping (`tz_windows_iana`, `Turkey Standard Time` style keys). Without it only IANA names resolve. |
+
+```bash
+# Full build (default)
+alya install
+alya test
+
+# Slim build (IANA only)
+alya install --no-default-features
+alya test --no-default-features
+```
+
 ---
 
 ## 🚀 Quick Start

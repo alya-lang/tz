@@ -29,7 +29,7 @@ pub function engine_tz_rule(name: string)
     let cname = tzdata_canonical(name)
     for r in tzdata_rules()
         if r.name == cname
-            return r
+            return tzrule_copy(r)
         end
     end
     @cfg(feature = "windows")
@@ -38,7 +38,7 @@ pub function engine_tz_rule(name: string)
     if wname != "" and wname != cname
         for r in tzdata_rules()
             if r.name == wname
-                return r
+                return tzrule_copy(r)
             end
         end
     end
@@ -74,7 +74,7 @@ pub function engine_tz_names() -> array
     return res
 end
 
-function _tz_require(name: string)
+function _tz_require(name: string) -> TzRule
     let r = engine_tz_rule(name)
     if r is null
         throw TzError { message: f"Unknown timezone: {name}" }

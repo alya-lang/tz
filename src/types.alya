@@ -141,6 +141,37 @@ pub function dst_rule(name: string, std_abbr: string, dst_abbr: string, std_offs
     }
 end
 
+## Copies a rule into a freshly-owned struct.
+##
+## Returned rules must not borrow the lookup table: the table is a
+## per-call temporary the compiler is free to release on return, so
+## callers get an owned copy (see alya-lang/alya#79).
+##
+## ### Parameters
+## - `r`: Source rule.
+##
+## ### Returns
+## An owned copy of `r`.
+pub function tzrule_copy(r: TzRule) -> TzRule
+    return TzRule {
+        name: r.name,
+        std_abbr: r.std_abbr,
+        dst_abbr: r.dst_abbr,
+        std_offset_min: r.std_offset_min,
+        dst_offset_min: r.dst_offset_min,
+        dst_start_month: r.dst_start_month,
+        dst_start_week: r.dst_start_week,
+        dst_start_weekday: r.dst_start_weekday,
+        dst_start_hour: r.dst_start_hour,
+        dst_start_utc: r.dst_start_utc,
+        dst_end_month: r.dst_end_month,
+        dst_end_week: r.dst_end_week,
+        dst_end_weekday: r.dst_end_weekday,
+        dst_end_hour: r.dst_end_hour,
+        dst_end_utc: r.dst_end_utc
+    }
+end
+
 ## Returns 1 when the rule carries a daylight-saving schedule, 0 for fixed zones.
 ##
 ## ### Parameters

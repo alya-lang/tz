@@ -7,28 +7,38 @@ import "../src/lib.alya" as pkg
 function main()
     let runner = bench_runner("tz Micro-Benchmarks")
 
+    # x86 smoke uses fewer iterations: sustained allocation across the
+    # full 140k ops exhausts the 32-bit address space (SIGSEGV).
+    let scale = 1
+    if target_arch() == "x86"
+        scale = 10
+    end
+
     # Bench 1: tz_offset_min on a fixed zone — 50k iterations
-    bench_start(runner, 50000)
+    let n1 = 50000 / scale
+    bench_start(runner, n1)
     let i = 0
-    while i < 50000
+    while i < n1
         pkg::tz_offset_min("Asia/Tokyo", 1704067200)
         i += 1
     end
     bench_stop(runner, "tz_offset_min fixed 50k calls")
 
     # Bench 2: tz_offset_min on a DST zone — 20k iterations
-    bench_start(runner, 20000)
+    let n2 = 20000 / scale
+    bench_start(runner, n2)
     let j = 0
-    while j < 20000
+    while j < n2
         pkg::tz_offset_min("America/New_York", 1721068245)
         j += 1
     end
     bench_stop(runner, "tz_offset_min DST 20k calls")
 
     # Bench 3: epoch_to_zoned roundtrip — 20k iterations
-    bench_start(runner, 20000)
+    let n3 = 20000 / scale
+    bench_start(runner, n3)
     let k = 0
-    while k < 20000
+    while k < n3
         let w = pkg::epoch_to_zoned(1704067200, "Europe/Berlin")
         pkg::zoned_to_epoch(w, "Europe/Berlin")
         k += 1
@@ -36,9 +46,10 @@ function main()
     bench_stop(runner, "zoned roundtrip 20k calls")
 
     # Bench 4: tz_rule lookup miss — 50k iterations
-    bench_start(runner, 50000)
+    let n4 = 50000 / scale
+    bench_start(runner, n4)
     let m = 0
-    while m < 50000
+    while m < n4
         pkg::tz_is_valid("Moon/Sea")
         m += 1
     end

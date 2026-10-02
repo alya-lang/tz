@@ -7,15 +7,8 @@ import "../src/lib.alya" as pkg
 function main()
     let runner = bench_runner("tz Micro-Benchmarks")
 
-    # x86 smoke uses fewer iterations: sustained allocation across the
-    # full 140k ops exhausts the 32-bit address space (SIGSEGV).
-    let scale = 1
-    if target_arch() == "x86"
-        scale = 10
-    end
-
     # Bench 1: tz_offset_min on a fixed zone — 50k iterations
-    let n1 = 50000 / scale
+    let n1 = 50000
     bench_start(runner, n1)
     let i = 0
     while i < n1
@@ -25,7 +18,7 @@ function main()
     bench_stop(runner, "tz_offset_min fixed 50k calls")
 
     # Bench 2: tz_offset_min on a DST zone — 20k iterations
-    let n2 = 20000 / scale
+    let n2 = 20000
     bench_start(runner, n2)
     let j = 0
     while j < n2
@@ -35,7 +28,7 @@ function main()
     bench_stop(runner, "tz_offset_min DST 20k calls")
 
     # Bench 3: epoch_to_zoned roundtrip — 20k iterations
-    let n3 = 20000 / scale
+    let n3 = 20000
     bench_start(runner, n3)
     let k = 0
     while k < n3
@@ -46,7 +39,7 @@ function main()
     bench_stop(runner, "zoned roundtrip 20k calls")
 
     # Bench 4: tz_rule lookup miss — 50k iterations
-    let n4 = 50000 / scale
+    let n4 = 50000
     bench_start(runner, n4)
     let m = 0
     while m < n4

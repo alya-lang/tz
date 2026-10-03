@@ -11,12 +11,12 @@ function main()
     # ═══════════════════════════════════════════════════════════
     # 1. Zone lookup & validity
     # ═══════════════════════════════════════════════════════════
-    runner_assert_eq(r, pkg::tz_is_valid("Europe/Istanbul"), 1, "Istanbul is bundled")
-    runner_assert_eq(r, pkg::tz_is_valid("Asia/Shanghai"), 1, "Shanghai is bundled")
-    runner_assert_eq(r, pkg::tz_is_valid("America/New_York"), 1, "New_York is bundled")
-    runner_assert_eq(r, pkg::tz_is_valid("UTC"), 1, "UTC alias resolves")
-    runner_assert_eq(r, pkg::tz_is_valid("Moon/Sea"), 0, "unknown zone is invalid")
-    runner_assert_eq(r, pkg::tz_is_valid(""), 0, "empty zone is invalid")
+    runner_assert_eq(r, pkg::tz_is_valid("Europe/Istanbul"), true, "Istanbul is bundled")
+    runner_assert_eq(r, pkg::tz_is_valid("Asia/Shanghai"), true, "Shanghai is bundled")
+    runner_assert_eq(r, pkg::tz_is_valid("America/New_York"), true, "New_York is bundled")
+    runner_assert_eq(r, pkg::tz_is_valid("UTC"), true, "UTC alias resolves")
+    runner_assert_eq(r, pkg::tz_is_valid("Moon/Sea"), false, "unknown zone is invalid")
+    runner_assert_eq(r, pkg::tz_is_valid(""), false, "empty zone is invalid")
 
     runner_assert_str_eq(r, pkg::tz_canonical("UTC"), "Etc/UTC", "UTC canonicalizes to Etc/UTC")
     runner_assert_str_eq(r, pkg::tz_canonical("Europe/Berlin"), "Europe/Berlin", "canonical names pass through")
@@ -28,10 +28,10 @@ function main()
     let rule = pkg::tz_rule("Asia/Tokyo")
     runner_assert_str_eq(r, rule.std_abbr, "JST", "Tokyo abbr is JST")
     runner_assert_eq(r, rule.std_offset_min, 540, "Tokyo offset is +540")
-    runner_assert_eq(r, rule.has_dst(), 0, "Tokyo is fixed")
+    runner_assert_eq(r, rule.has_dst(), false, "Tokyo is fixed")
 
     let ny = pkg::tz_rule("America/New_York")
-    runner_assert_eq(r, ny.has_dst(), 1, "New_York has DST")
+    runner_assert_eq(r, ny.has_dst(), true, "New_York has DST")
 
     let missing = pkg::tz_rule("Moon/Sea")
     runner_assert_true(r, missing is null, "unknown zone rule is null")
@@ -119,29 +119,29 @@ function main()
     # ═══════════════════════════════════════════════════════════
     # 7. Error paths (unknown zone, invalid date)
     # ═══════════════════════════════════════════════════════════
-    let threw = 0
+    let threw = false
     try
         pkg::tz_offset_min("Moon/Sea", 0)
     catch err
-        threw = 1
+        threw = true
     end
-    runner_assert_eq(r, threw, 1, "unknown zone offset throws")
+    runner_assert_eq(r, threw, true, "unknown zone offset throws")
 
-    threw = 0
+    threw = false
     try
         pkg::epoch_to_zoned(0, "Moon/Sea")
     catch err
-        threw = 1
+        threw = true
     end
-    runner_assert_eq(r, threw, 1, "unknown zone conversion throws")
+    runner_assert_eq(r, threw, true, "unknown zone conversion throws")
 
-    threw = 0
+    threw = false
     try
         pkg::zoned_to_epoch({ "year": 2023, "month": 2, "day": 29, "hour": 0, "minute": 0, "second": 0 }, "Etc/UTC")
     catch err
-        threw = 1
+        threw = true
     end
-    runner_assert_eq(r, threw, 1, "Feb 29 2023 throws")
+    runner_assert_eq(r, threw, true, "Feb 29 2023 throws")
 
     # ═══════════════════════════════════════════════════════════
     # 8. Extended coverage: odd offsets, new zones, new API, Windows keys
@@ -160,10 +160,10 @@ function main()
     runner_assert_eq(r, pkg::tz_offset_min("Australia/Brisbane", 1704067200), 600, "Brisbane +600 fixed")
     runner_assert_eq(r, pkg::zoned_to_epoch(pkg::epoch_to_zoned(1704067200, "Asia/Kathmandu"), "Asia/Kathmandu"), 1704067200, "Kathmandu roundtrip")
 
-    runner_assert_eq(r, pkg::tz_is_dst("America/New_York", 1704067200), 0, "NY not DST in January")
-    runner_assert_eq(r, pkg::tz_is_dst("America/New_York", 1721068245), 1, "NY DST in July")
-    runner_assert_eq(r, pkg::tz_is_dst("Asia/Tokyo", 1721068245), 0, "fixed zone never DST")
-    runner_assert_eq(r, pkg::tz_is_dst("Australia/Sydney", 1704067200), 1, "Sydney DST in January")
+    runner_assert_eq(r, pkg::tz_is_dst("America/New_York", 1704067200), false, "NY not DST in January")
+    runner_assert_eq(r, pkg::tz_is_dst("America/New_York", 1721068245), true, "NY DST in July")
+    runner_assert_eq(r, pkg::tz_is_dst("Asia/Tokyo", 1721068245), false, "fixed zone never DST")
+    runner_assert_eq(r, pkg::tz_is_dst("Australia/Sydney", 1704067200), true, "Sydney DST in January")
 
     runner_assert_str_eq(r, pkg::tz_offset_str("Europe/Istanbul", 1704067200), "+03:00", "offset_str Istanbul")
     runner_assert_str_eq(r, pkg::tz_offset_str("America/New_York", 1704067200), "-05:00", "offset_str NY winter")
@@ -219,12 +219,12 @@ function main()
     # 10. Transitions: dst_range + next_transition
     # ═══════════════════════════════════════════════════════════
     let nyr = pkg::tz_dst_range("America/New_York", 2024)
-    runner_assert_eq(r, nyr["has_dst"], 1, "NY 2024 has DST")
+    runner_assert_eq(r, nyr["has_dst"], true, "NY 2024 has DST")
     runner_assert_eq(r, nyr["start_utc"], 1710054000, "NY 2024 spring forward")
     runner_assert_eq(r, nyr["end_utc"], 1730613600, "NY 2024 fall back")
 
     let tokyo_range = pkg::tz_dst_range("Asia/Tokyo", 2024)
-    runner_assert_eq(r, tokyo_range["has_dst"], 0, "Tokyo has no DST")
+    runner_assert_eq(r, tokyo_range["has_dst"], false, "Tokyo has no DST")
     runner_assert_eq(r, tokyo_range["start_utc"], 0, "fixed range start is 0")
 
     runner_assert_eq(r, pkg::next_transition("America/New_York", 1704067200), 1710054000, "next after Jan is spring")
@@ -245,13 +245,13 @@ function main()
 
     let europe = pkg::tz_by_region("Europe/")
     runner_assert_true(r, len(europe) > 10, "many European zones")
-    let all_eu = 1
+    let all_eu = true
     for z in europe
         if substring(z, 0, 7) != "Europe/"
-            all_eu = 0
+            all_eu = false
         end
     end
-    runner_assert_eq(r, all_eu, 1, "region filter is exact")
+    runner_assert_eq(r, all_eu, true, "region filter is exact")
     runner_assert_eq(r, len(pkg::tz_by_region("Moon/")), 0, "empty region matches nothing")
 
     let zero_zones = pkg::tz_by_offset(0)
@@ -320,13 +320,13 @@ function main()
     end
 end
 
-function names_contains(names, want: string) -> int
+function names_contains(names, want: string) -> bool
     for n in names
         if n == want
-            return 1
+            return true
         end
     end
-    return 0
+    return false
 end
 
 function zone_contains(names, want: string) -> int
@@ -339,13 +339,13 @@ function check_windows_keys(r)
     runner_assert_str_eq(r, pkg::tz_windows_iana("No Such Zone"), "", "windows table unknown is empty")
 
     let win_rule = pkg::tz_rule("Turkey Standard Time")
-    let win_ok = 0
+    let win_ok = false
     if win_rule is null
-        win_ok = 0
+        win_ok = false
     else
-        win_ok = 1
+        win_ok = true
     end
-    runner_assert_eq(r, win_ok, 1, "Windows key resolves to a rule")
+    runner_assert_eq(r, win_ok, true, "Windows key resolves to a rule")
     runner_assert_str_eq(r, win_rule.name, "Europe/Istanbul", "Windows key rule is Istanbul")
     runner_assert_eq(r, pkg::tz_offset_min("Eastern Standard Time", 1704067200), 0 - 300, "Windows key offset works")
     runner_assert_eq(r, pkg::epoch_to_zoned(1704067200, "Tokyo Standard Time")["hour"], 9, "Windows key conversion works")

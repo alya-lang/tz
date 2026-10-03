@@ -179,9 +179,9 @@ end
 ##
 ## ### Returns
 ## 1 when `dst_start_month` is non-zero, 0 otherwise.
-pub function TzRule.has_dst(self: TzRule) -> int
+pub function TzRule.has_dst(self: TzRule) -> bool
     if self.dst_start_month == 0
-        return 0
+        return false
     end
-    return 1
+    return true
 end

@@ -32,7 +32,7 @@ end
 ##
 ## ### Returns
 ## 1 for known zones, 0 otherwise.
-pub function tz_is_valid(name: string) -> int
+pub function tz_is_valid(name: string) -> bool
     return engine_tz_is_valid(name)
 end
 
@@ -58,7 +58,7 @@ end
 ##
 ## ### Throws
 ## `TzError` when the zone is not bundled.
-pub function tz_is_dst(name: string, epoch: int) -> int
+pub function tz_is_dst(name: string, epoch: int) -> bool
     return engine_tz_is_dst(name, epoch)
 end
 

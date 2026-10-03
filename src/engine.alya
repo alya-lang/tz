@@ -52,11 +52,11 @@ end
 ##
 ## ### Returns
 ## 1 for known zones, 0 otherwise.
-pub function engine_tz_is_valid(name: string) -> int
+pub function engine_tz_is_valid(name: string) -> bool
     if engine_tz_rule(name) is null
-        return 0
+        return false
     end
-    return 1
+    return true
 end
 
 ## Returns all bundled IANA zone names.
@@ -105,14 +105,14 @@ function _tz_nth_weekday(year: int, month: int, week: int, weekday: int) -> int
     return day
 end
 
-function _tz_transition_utc(rule, year: int, is_start: int) -> int
+function _tz_transition_utc(rule, year: int, is_start: bool) -> int
     let month: int = rule.dst_end_month
     let week: int = rule.dst_end_week
     let weekday: int = rule.dst_end_weekday
     let hour: int = rule.dst_end_hour
     let as_utc: int = rule.dst_end_utc
     let base_min: int = rule.dst_offset_min
-    if is_start == 1
+    if is_start == true
         month = rule.dst_start_month
         week = rule.dst_start_week
         weekday = rule.dst_start_weekday
@@ -143,12 +143,12 @@ end
 ## `TzError` when the zone is not bundled.
 pub function engine_tz_offset_min(name: string, epoch: int) -> int
     let rule = _tz_require(name)
-    if rule.has_dst() == 0
+    if rule.has_dst() == false
         return rule.std_offset_min
     end
     let year: int = epoch_to_date(epoch)["year"]
-    let start_utc: int = _tz_transition_utc(rule, year, 1)
-    let end_utc: int = _tz_transition_utc(rule, year, 0)
+    let start_utc: int = _tz_transition_utc(rule, year, true)
+    let end_utc: int = _tz_transition_utc(rule, year, false)
     if rule.dst_start_month <= rule.dst_end_month
         if epoch >= start_utc and epoch < end_utc
             return rule.dst_offset_min
@@ -174,7 +174,7 @@ end
 ## `TzError` when the zone is not bundled.
 pub function engine_tz_abbrev(name: string, epoch: int) -> string
     let rule = _tz_require(name)
-    if rule.has_dst() == 0
+    if rule.has_dst() == false
         return rule.std_abbr
     end
     if engine_tz_offset_min(name, epoch) == rule.dst_offset_min
@@ -194,15 +194,15 @@ end
 ##
 ## ### Throws
 ## `TzError` when the zone is not bundled.
-pub function engine_tz_is_dst(name: string, epoch: int) -> int
+pub function engine_tz_is_dst(name: string, epoch: int) -> bool
     let rule = _tz_require(name)
-    if rule.has_dst() == 0
-        return 0
+    if rule.has_dst() == false
+        return false
     end
     if engine_tz_offset_min(name, epoch) == rule.dst_offset_min
-        return 1
+        return true
     end
-    return 0
+    return false
 end
 
 ## Formats a minute offset as `+HH:MM` (zero renders as `+00:00`).
@@ -259,7 +259,7 @@ pub function engine_epoch_to_zoned(epoch: int, name: string)
     let off: int = engine_tz_offset_min(name, epoch)
     let local = epoch_to_date(epoch + off * 60)
     local["offset_min"] = off
-    if off == rule.dst_offset_min and rule.has_dst() == 1
+    if off == rule.dst_offset_min and rule.has_dst() == true
         local["abbr"] = rule.dst_abbr
     else
         local["abbr"] = rule.std_abbr
@@ -403,13 +403,13 @@ end
 ## `TzError` when the zone is not bundled.
 pub function engine_tz_dst_range(name: string, year: int)
     let rule = _tz_require(name)
-    if rule.has_dst() == 0
-        return { "has_dst": 0, "start_utc": 0, "end_utc": 0 }
+    if rule.has_dst() == false
+        return { "has_dst": false, "start_utc": 0, "end_utc": 0 }
     end
     return {
-        "has_dst": 1,
-        "start_utc": _tz_transition_utc(rule, year, 1),
-        "end_utc": _tz_transition_utc(rule, year, 0)
+        "has_dst": true,
+        "start_utc": _tz_transition_utc(rule, year, true),
+        "end_utc": _tz_transition_utc(rule, year, false)
     }
 end
 
@@ -426,12 +426,12 @@ end
 ## `TzError` when the zone is not bundled.
 pub function engine_next_transition(name: string, epoch: int)
     let rule = _tz_require(name)
-    if rule.has_dst() == 0
+    if rule.has_dst() == false
         return null
     end
     let year: int = epoch_to_date(epoch)["year"]
-    let start_utc: int = _tz_transition_utc(rule, year, 1)
-    let end_utc: int = _tz_transition_utc(rule, year, 0)
+    let start_utc: int = _tz_transition_utc(rule, year, true)
+    let end_utc: int = _tz_transition_utc(rule, year, false)
     if rule.dst_start_month <= rule.dst_end_month
         if epoch < start_utc
             return start_utc
@@ -439,7 +439,7 @@ pub function engine_next_transition(name: string, epoch: int)
         if epoch < end_utc
             return end_utc
         end
-        return _tz_transition_utc(rule, year + 1, 1)
+        return _tz_transition_utc(rule, year + 1, true)
     end
     if epoch < end_utc
         return end_utc
@@ -447,24 +447,24 @@ pub function engine_next_transition(name: string, epoch: int)
     if epoch < start_utc
         return start_utc
     end
-    return _tz_transition_utc(rule, year + 1, 0)
+    return _tz_transition_utc(rule, year + 1, false)
 end
 
 # --- Wall-time string parsing ---
 
-function _tz_parse_digits(s: string) -> int
+function _tz_parse_digits(s: string) -> bool
     if len(s) == 0
-        return 0
+        return false
     end
     let i: int = 0
     while i < len(s)
         let c: int = ord(char_at(s, i))
         if c < 48 or c > 57
-            return 0
+            return false
         end
         i += 1
     end
-    return 1
+    return true
 end
 
 function _tz_parse_num(s: string, pos: int, count: int) -> int
@@ -472,7 +472,7 @@ function _tz_parse_num(s: string, pos: int, count: int) -> int
         return -1
     end
     let part: string = substring(s, pos, count)
-    if _tz_parse_digits(part) == 0
+    if _tz_parse_digits(part) == false
         return -1
     end
     return to_int(part)
@@ -537,7 +537,7 @@ pub function engine_parse_zoned(s: string, name: string) -> int
     if pos < n and char_at(s, pos) == "."
         pos += 1
         let frac_start: int = pos
-        while pos < n and _tz_parse_digits(char_at(s, pos)) == 1
+        while pos < n and _tz_parse_digits(char_at(s, pos)) == true
             pos += 1
         end
         if pos == frac_start

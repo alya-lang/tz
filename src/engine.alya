@@ -98,9 +98,9 @@ function _tz_nth_weekday(year: int, month: int, week: int, weekday: int) -> int
         end
         return day
     end
-    day = day + (week - 1) * 7
+    day += (week - 1) * 7
     if day > dim
-        day = day - 7
+        day -= 7
     end
     return day
 end
